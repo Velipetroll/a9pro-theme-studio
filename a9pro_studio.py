@@ -2041,8 +2041,8 @@ def get_studio_ui_html() -> str:
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
         const fh = imHeight(layer);
-        const dw = layer.fit_screen ? 320 : (layer.target_w || fw);
-        const dh = layer.fit_screen ? 172 : (layer.target_h || fh);
+        const dw = layer.fit_screen ? 320 : fw;
+        const dh = layer.fit_screen ? 172 : fh;
         const x = layer.fit_screen ? 160 : layer.x;
         const y = layer.fit_screen ? 86 : layer.y;
 
@@ -2088,8 +2088,8 @@ def get_studio_ui_html() -> str:
           const cnt = layer.count || 1;
           const fw = Math.floor(imWidth(layer) / cnt);
           const fh = imHeight(layer);
-          const dw = layer.fit_screen ? 320 : (layer.target_w || fw);
-          const dh = layer.fit_screen ? 172 : (layer.target_h || fh);
+          const dw = layer.fit_screen ? 320 : fw;
+          const dh = layer.fit_screen ? 172 : fh;
           const x = layer.fit_screen ? 160 : layer.x;
           const y = layer.fit_screen ? 86 : layer.y;
 
@@ -2444,8 +2444,8 @@ def get_studio_ui_html() -> str:
           await new Promise(r => { im.onload = r; im.src = data.image_data; });
           l.image_data = data.image_data;
           l._imgObj = im;
-          l.width = targetW;
-          l.height = targetH;
+          l.width = im.width;
+          l.height = im.height;
           selectLayer(l.id);
           drawCanvas();
         } catch (e) {
@@ -2571,8 +2571,8 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
-        const dw = l.fit_screen ? 320 : (l.target_w || fw);
-        const dh = l.fit_screen ? 172 : (l.target_h || fh);
+        const dw = l.fit_screen ? 320 : fw;
+        const dh = l.fit_screen ? 172 : fh;
         const lx = l.fit_screen ? 160 : l.x;
         const ly = l.fit_screen ? 86 : l.y;
         if (mx >= lx - dw / 2 && mx <= lx + dw / 2 && my >= ly - dh / 2 && my <= ly + dh / 2) {
