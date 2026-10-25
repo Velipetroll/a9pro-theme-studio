@@ -1557,19 +1557,19 @@ def get_studio_ui_html() -> str:
                   <span class="text-gray-400 font-semibold">🎨 Comprimir Colores (KB):</span>
                 </div>
                 <div class="grid grid-cols-5 gap-1 text-[11px]">
-                  <button onclick="compressLayerQuality(128)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="Calidad Alta: 128 colores (reduce ~30% KB)">
+                  <button id="btn-col-128" onclick="compressLayerQuality(128)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="Calidad Alta: 128 colores (reduce ~30% KB)">
                     128c
                   </button>
-                  <button onclick="compressLayerQuality(64)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-300 transition" title="Calidad Media: 64 colores (reduce ~50% KB)">
+                  <button id="btn-col-64" onclick="compressLayerQuality(64)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-300 transition" title="Calidad Media: 64 colores (reduce ~50% KB)">
                     64c
                   </button>
-                  <button onclick="compressLayerQuality(32)" class="p-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 rounded font-semibold text-amber-200 transition" title="Compresión Fuerte: 32 colores (reduce ~70% KB)">
+                  <button id="btn-col-32" onclick="compressLayerQuality(32)" class="p-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 rounded font-semibold text-amber-200 transition" title="Compresión Fuerte: 32 colores (reduce ~70% KB)">
                     32c
                   </button>
-                  <button onclick="compressLayerQuality(16)" class="p-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 rounded font-semibold text-rose-200 transition" title="Compresión Ultra: 16 colores (reduce ~85% KB)">
+                  <button id="btn-col-16" onclick="compressLayerQuality(16)" class="p-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 rounded font-semibold text-rose-200 transition" title="Compresión Ultra: 16 colores (reduce ~85% KB)">
                     16c
                   </button>
-                  <button onclick="compressLayerQuality(8)" class="p-1.5 bg-red-950/80 hover:bg-red-900 border border-red-700/70 rounded font-semibold text-red-200 transition" title="Compresión Extrema / Retro: 8 colores (reduce hasta 90% KB)">
+                  <button id="btn-col-8" onclick="compressLayerQuality(8)" class="p-1.5 bg-red-950/80 hover:bg-red-900 border border-red-700/70 rounded font-semibold text-red-200 transition" title="Compresión Extrema / Retro: 8 colores (reduce hasta 90% KB)">
                     8c
                   </button>
                 </div>
@@ -2159,6 +2159,26 @@ def get_studio_ui_html() -> str:
           el.className = 'p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition';
         }
       });
+
+      // Indicador de botones de compresión de color
+      const curColors = l.max_colors;
+      const colBtns = [
+        { id: 'btn-col-128', colors: 128 },
+        { id: 'btn-col-64', colors: 64 },
+        { id: 'btn-col-32', colors: 32 },
+        { id: 'btn-col-16', colors: 16 },
+        { id: 'btn-col-8', colors: 8 }
+      ];
+      colBtns.forEach(b => {
+        const el = document.getElementById(b.id);
+        if (!el) return;
+        const isActive = (Number(curColors) === Number(b.colors));
+        if (isActive) {
+          el.className = 'p-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
+        } else {
+          el.className = 'p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition';
+        }
+      });
       const resInfo = document.getElementById('txt-res-pct-info');
       if (resInfo) {
         const cnt = l.count || 1;
@@ -2269,6 +2289,8 @@ def get_studio_ui_html() -> str:
           await new Promise(r => { im.onload = r; im.src = data.strip_data; });
           l.image_data = data.strip_data;
           l._imgObj = im;
+          l.target_w = targetW;
+          l.target_h = targetH;
           l.width = im.width;
           l.height = im.height;
           l.count = data.count;
@@ -2318,6 +2340,8 @@ def get_studio_ui_html() -> str:
           await new Promise(r => { im.onload = r; im.src = data.image_data; });
           l.image_data = data.image_data;
           l._imgObj = im;
+          l.target_w = targetW;
+          l.target_h = targetH;
           l.width = targetW;
           l.height = targetH;
           selectLayer(l.id);
