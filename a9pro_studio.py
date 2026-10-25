@@ -1176,6 +1176,12 @@ def get_studio_ui_html() -> str:
     body { background-color: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .screen-bezel { background: #000; border: 4px solid #1f2937; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7); }
     .slider-vertical { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 110px; }
+    canvas {
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-crisp-edges;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -2048,6 +2054,7 @@ def get_studio_ui_html() -> str:
     let animFrameIndex = 0;
 
     function drawCanvas() {
+      ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, 320, 172);
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, 320, 172);
@@ -2095,6 +2102,7 @@ def get_studio_ui_html() -> str:
       const boxCanvas = document.getElementById('box-screen-canvas');
       if (boxCanvas) {
         const bCtx = boxCanvas.getContext('2d');
+        bCtx.imageSmoothingEnabled = false;
         bCtx.clearRect(0, 0, 320, 172);
         bCtx.fillStyle = "#000000";
         bCtx.fillRect(0, 0, 320, 172);
