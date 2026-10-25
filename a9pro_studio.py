@@ -722,7 +722,7 @@ class ThemeStudioEngine:
             raise ValueError("No hay capas visibles para compilar.")
 
         # Recortar solo al compilar/enviar las capas que se salen del área visible (320x172),
-        # sin alterar las capas en el personalizador visual.
+        # y reescalar a resolución de pantalla completa (320x172) si tienen fit_screen activado.
         cropped_active_layers = []
         for l in active_layers:
             # Excluir capas de fecha/reloj en mode=4 (dígitos numéricos) ya que son tiras de glifos 0..9
@@ -734,13 +734,33 @@ class ThemeStudioEngine:
                 img_b64 = l["image_data"].split(",", 1)[-1]
                 im = Image.open(io.BytesIO(base64.b64decode(img_b64)))
                 cnt = l.get("count", 1)
+                l_copy = dict(l)
+
+                # Si la capa tiene activada la opción de pantalla completa (fit_screen):
+                # Reescalar cada frame exactamente a 320x172 usando NEAREST (mantiene los píxeles nítidos
+                # y comprime de forma óptima con el algoritmo RLE/PA del hardware).
+                if l.get("fit_screen"):
+                    orig_fw = im.width // cnt if cnt > 0 else im.width
+                    orig_fh = im.height
+                    if (orig_fw, orig_fh) != (320, 172):
+                        scaled_strip = Image.new("RGBA", (320 * cnt, 172), (0, 0, 0, 0))
+                        for i in range(cnt):
+                            frame = im.crop((i * orig_fw, 0, (i + 1) * orig_fw, orig_fh))
+                            frame_scaled = frame.resize((320, 172), Image.Resampling.NEAREST)
+                            scaled_strip.paste(frame_scaled, (i * 320, 0))
+                        im = scaled_strip
+                    l_copy["x"] = 160
+                    l_copy["y"] = 86
+                    l_copy["target_w"] = 320
+                    l_copy["target_h"] = 172
+
                 crop_res = ThemeStudioEngine.crop_layer_to_viewport(
                     im,
-                    int(l.get("x", 160)),
-                    int(l.get("y", 86)),
+                    int(l_copy.get("x", 160)),
+                    int(l_copy.get("y", 86)),
                     cnt=cnt,
-                    target_w=l.get("target_w"),
-                    target_h=l.get("target_h")
+                    target_w=l_copy.get("target_w"),
+                    target_h=l_copy.get("target_h")
                 )
                 if crop_res is None:
                     # Capa 100% fuera de pantalla: omitir
@@ -748,7 +768,6 @@ class ThemeStudioEngine:
                 crop_im, nx, ny = crop_res
                 buf = io.BytesIO()
                 crop_im.save(buf, format="PNG")
-                l_copy = dict(l)
                 l_copy["image_data"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
                 l_copy["x"] = nx
                 l_copy["y"] = ny
