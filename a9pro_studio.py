@@ -1617,9 +1617,10 @@ def get_studio_ui_html() -> str:
                 <span id="txt-layer-dims" class="text-gray-300 font-mono">0×0 px</span>
               </div>
               
-              <!-- Ajuste de Escala a Pantalla Completa -->
-              <button onclick="fitLayerToScreen()" class="w-full p-1.5 bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 text-blue-200 rounded-lg font-semibold text-xs flex items-center justify-center gap-1 transition" title="Redimensiona y ajusta exactamente a 320x172 px centrado">
-                📐 Ajustar a Pantalla Completa (320×172)
+              <!-- Ajuste de Escala a Pantalla Completa (Toggle) -->
+              <button id="btn-toggle-fullscreen" onclick="toggleLayerFullScreen()" class="w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition" title="Activa o desactiva el ajuste automático a pantalla completa (320×172)">
+                <span>📐 Pantalla Completa (320×172):</span>
+                <span id="txt-fullscreen-status" class="font-bold text-gray-400">OFF</span>
               </button>
 
               <!-- Reductor de Resolución (Reduce peso en KB manteniendo la escala en pantalla) -->
@@ -2181,56 +2182,58 @@ def get_studio_ui_html() -> str:
             if (inpExact) inpExact.value = cnt;
             const inpDiv = document.getElementById('inp-gif-divisor');
             if (inpDiv && l.active_divisor) inpDiv.value = l.active_divisor;
-            updateGifButtonsUI(l);
           } else {
             gifOpt.classList.add('hidden');
           }
         }
+        updateGifButtonsUI(l);
       }
       updateLayersListUI();
       drawCanvas();
     }
 
     function updateGifButtonsUI(l) {
-      if (!l || l.type !== 0x13) return;
-      const divisorBtns = [
-        { id: 'btn-subsample-2', div: 2 },
-        { id: 'btn-subsample-3', div: 3 },
-        { id: 'btn-subsample-4', div: 4 }
-      ];
-      divisorBtns.forEach(b => {
-        const el = document.getElementById(b.id);
-        if (!el) return;
-        const isActive = Number(l.active_divisor) === Number(b.div);
-        if (isActive) {
-          el.className = 'px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
-        } else {
-          el.className = 'px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs font-semibold border border-transparent transition';
-        }
-      });
+      if (!l) return;
+      if (l.type === 0x13) {
+        const divisorBtns = [
+          { id: 'btn-subsample-2', div: 2 },
+          { id: 'btn-subsample-3', div: 3 },
+          { id: 'btn-subsample-4', div: 4 }
+        ];
+        divisorBtns.forEach(b => {
+          const el = document.getElementById(b.id);
+          if (!el) return;
+          const isActive = Number(l.active_divisor) === Number(b.div);
+          if (isActive) {
+            el.className = 'px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
+          } else {
+            el.className = 'px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs font-semibold border border-transparent transition';
+          }
+        });
 
-      const exactBtns = [
-        { id: 'btn-exact-4', cnt: 4 },
-        { id: 'btn-exact-6', cnt: 6 },
-        { id: 'btn-exact-8', cnt: 8 }
-      ];
-      exactBtns.forEach(b => {
-        const el = document.getElementById(b.id);
-        if (!el) return;
-        const isActive = !l.active_divisor && (Number(l.count) === Number(b.cnt));
-        if (isActive) {
-          el.className = 'px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
-        } else {
-          el.className = 'px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition';
-        }
-      });
+        const exactBtns = [
+          { id: 'btn-exact-4', cnt: 4 },
+          { id: 'btn-exact-6', cnt: 6 },
+          { id: 'btn-exact-8', cnt: 8 }
+        ];
+        exactBtns.forEach(b => {
+          const el = document.getElementById(b.id);
+          if (!el) return;
+          const isActive = !l.active_divisor && (Number(l.count) === Number(b.cnt));
+          if (isActive) {
+            el.className = 'px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
+          } else {
+            el.className = 'px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition';
+          }
+        });
 
-      // Indicador de velocidad de hardware en el reloj sincronizada automáticamente
-      const fDur = l.frame_duration_ms || 100;
-      const hwTicks = (l.extra && l.extra[2]) ? l.extra[2] : Math.max(5, Math.min(50, Math.round(fDur / 10)));
-      const speedInfo = document.getElementById('txt-hw-speed-info');
-      if (speedInfo) {
-        speedInfo.innerText = `${fDur}ms/f (${hwTicks} ticks)`;
+        // Indicador de velocidad de hardware en el reloj sincronizada automáticamente
+        const fDur = l.frame_duration_ms || 100;
+        const hwTicks = (l.extra && l.extra[2]) ? l.extra[2] : Math.max(5, Math.min(50, Math.round(fDur / 10)));
+        const speedInfo = document.getElementById('txt-hw-speed-info');
+        if (speedInfo) {
+          speedInfo.innerText = `${fDur}ms/f (${hwTicks} ticks)`;
+        }
       }
 
       // Indicador de resolución real de imagen
@@ -2252,6 +2255,21 @@ def get_studio_ui_html() -> str:
           el.className = 'p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition';
         }
       });
+      // Indicador y botón de Pantalla Completa (320×172)
+      const fsBtn = document.getElementById('btn-toggle-fullscreen');
+      const fsTxt = document.getElementById('txt-fullscreen-status');
+      if (fsBtn && fsTxt) {
+        if (l.fit_screen) {
+          fsBtn.className = 'w-full p-1.5 bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-900/50 transition';
+          fsTxt.innerText = 'ON (320×172)';
+          fsTxt.className = 'font-extrabold text-blue-100';
+        } else {
+          fsBtn.className = 'w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition';
+          fsTxt.innerText = 'OFF';
+          fsTxt.className = 'font-bold text-gray-400';
+        }
+      }
+
       const resInfo = document.getElementById('txt-res-pct-info');
       if (resInfo) {
         const cnt = l.count || 1;
@@ -2333,6 +2351,12 @@ def get_studio_ui_html() -> str:
       if (l.max_frames === undefined) l.max_frames = l.count || 8;
 
       const cnt = l.count || 1;
+      if (l.fit_screen) {
+        l.target_w = 320;
+        l.target_h = 172;
+        l.x = 160;
+        l.y = 86;
+      }
       const targetW = l.target_w || (Math.floor(l.width / cnt));
       const targetH = l.target_h || l.height;
 
@@ -2416,14 +2440,21 @@ def get_studio_ui_html() -> str:
       }
     }
 
-    // 1. Ajustar exactamente la capa al tamaño completo de la pantalla (320x172) y centrarla
-    async function fitLayerToScreen() {
+    // 1. Alternar ajuste a pantalla completa (320x172) persistente
+    async function toggleLayerFullScreen() {
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (!l) return alert('Selecciona una imagen o animación primero.');
-      l.target_w = 320;
-      l.target_h = 172;
-      l.x = 160;
-      l.y = 86;
+      l.fit_screen = !l.fit_screen;
+      if (l.fit_screen) {
+        l.target_w = 320;
+        l.target_h = 172;
+        l.x = 160;
+        l.y = 86;
+      } else {
+        const cnt = l.count || 1;
+        l.target_w = l.orig_video_w || l._origVideoW || Math.floor(imWidth(l) / cnt);
+        l.target_h = l.orig_video_h || l._origVideoH || imHeight(l);
+      }
       await applyLayerProcessing(l);
     }
 
@@ -2431,6 +2462,7 @@ def get_studio_ui_html() -> str:
     async function updateSelectedSize(dimension, val) {
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (!l) return;
+      l.fit_screen = false;
       const numVal = parseInt(val) || 16;
       const cnt = l.count || 1;
       const curW = l.target_w || Math.floor(imWidth(l) / cnt);
@@ -2445,6 +2477,7 @@ def get_studio_ui_html() -> str:
     async function scaleSelectedLayer(factor) {
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (!l) return alert('Selecciona una capa primero.');
+      l.fit_screen = false;
       const cnt = l.count || 1;
       const curW = l.target_w || Math.floor(imWidth(l) / cnt);
       const curH = l.target_h || imHeight(l);
