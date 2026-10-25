@@ -608,10 +608,6 @@ class ThemeStudioEngine:
             elif target_w and target_h:
                 frame = frame.resize((target_w, target_h), Image.Resampling.LANCZOS)
 
-            # Bajar resolución interna en porcentaje atado a la resolución del video original (Pixel Binning)
-            if res_pct < 100:
-                frame = ThemeStudioEngine._resample_internal_resolution(frame, res_pct=res_pct, base_w=base_w, base_h=base_h)
-
             # Comprimir información de imagen (cuantización de paleta)
             if max_colors < 256:
                 frame = ThemeStudioEngine._quantize_frame(frame, max_colors=max_colors)
@@ -644,10 +640,6 @@ class ThemeStudioEngine:
                 ry = (target_h - im.height) // 2
                 resized.paste(im, (rx, ry))
                 im = resized
-
-        # Bajar resolución interna en porcentaje atado a la resolución original de la imagen/video
-        if res_pct < 100:
-            im = ThemeStudioEngine._resample_internal_resolution(im, res_pct=res_pct, base_w=base_w, base_h=base_h)
 
         # Comprimir información de color reduciendo entropía para el algoritmo RLE de la caja
         if max_colors < 256:
@@ -2034,9 +2026,14 @@ def get_studio_ui_html() -> str:
           l._imgObj = im;
         }
         if (l.raw_gif_b64 && !l._rawGifB64) l._rawGifB64 = l.raw_gif_b64;
+        if (l.raw_img_b64 && !l._rawImgB64) l._rawImgB64 = l.raw_img_b64;
         if (l.orig_frames_count && !l._origFramesCount) l._origFramesCount = l.orig_frames_count;
         if (l.orig_video_w && !l._origVideoW) l._origVideoW = l.orig_video_w;
         if (l.orig_video_h && !l._origVideoH) l._origVideoH = l.orig_video_h;
+        if (!l.orig_w && l.orig_video_w) l.orig_w = l.orig_video_w;
+        if (!l.orig_h && l.orig_video_h) l.orig_h = l.orig_video_h;
+        if (!l.orig_w && l.target_w) l.orig_w = l.target_w;
+        if (!l.orig_h && l.target_h) l.orig_h = l.target_h;
       });
     }
 
@@ -2143,8 +2140,8 @@ def get_studio_ui_html() -> str:
         speedInfo.innerText = `${fDur}ms/f (${hwTicks} ticks)`;
       }
 
-      // Indicador de resolución interna atada al video
-      const curRes = l.res_pct || 100;
+      // Indicador de resolución atada al GIF o imagen original
+      const curRes = l.res_pct;
       const resBtns = [
         { id: 'btn-res-100', pct: 100 },
         { id: 'btn-res-80', pct: 80 },
@@ -2155,7 +2152,7 @@ def get_studio_ui_html() -> str:
       resBtns.forEach(b => {
         const el = document.getElementById(b.id);
         if (!el) return;
-        const isActive = (curRes === b.pct);
+        const isActive = (Number(curRes) === Number(b.pct));
         if (isActive) {
           el.className = 'p-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
         } else {
@@ -2164,11 +2161,14 @@ def get_studio_ui_html() -> str:
       });
       const resInfo = document.getElementById('txt-res-pct-info');
       if (resInfo) {
-        const vW = l._origVideoW || (l.width ? Math.floor(l.width / (l.count || 1)) : 320);
-        const vH = l._origVideoH || l.height || 172;
-        const effW = Math.round(vW * curRes / 100);
-        const effH = Math.round(vH * curRes / 100);
-        resInfo.innerText = `${curRes}% (${effW}×${effH} v-px)`;
+        const cnt = l.count || 1;
+        const curW = l.target_w || Math.floor(imWidth(l) / cnt);
+        const curH = l.target_h || imHeight(l);
+        if (curRes) {
+          resInfo.innerText = `${curRes}% (${curW}×${curH} px)`;
+        } else {
+          resInfo.innerText = `Manual (${curW}×${curH} px)`;
+        }
       }
     }
 
@@ -2181,134 +2181,6 @@ def get_studio_ui_html() -> str:
       }
     }
 
-    // Modificar tamaño manual (ancho o alto) redimensionando la imagen/fotogramas
-    async function updateSelectedSize(dimension, val) {
-      const l = project.layers.find(x => x.id === selectedLayerId);
-      if (!l) return;
-      const numVal = parseInt(val) || 16;
-      const cnt = l.count || 1;
-      const curW = Math.floor(imWidth(l) / cnt);
-      const curH = imHeight(l);
-
-      let targetW = curW;
-      let targetH = curH;
-      if (dimension === 'w') targetW = numVal;
-      if (dimension === 'h') targetH = numVal;
-
-      if (l.type === 0x13 && l._rawGifB64) {
-        try {
-          const res = await fetch('/api/themes/convert_gif', {
-            method: 'POST',
-            body: JSON.stringify({
-              gif_data: l._rawGifB64,
-              max_frames: l.count || 8,
-              target_w: targetW,
-              target_h: targetH
-            })
-          });
-          const data = await res.json();
-          if (data.success) {
-            const im = new Image();
-            await new Promise(r => { im.onload = r; im.src = data.strip_data; });
-            l.image_data = data.strip_data;
-            l._imgObj = im;
-            l.width = im.width;
-            l.height = im.height;
-            selectLayer(l.id);
-            drawCanvas();
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        try {
-          const res = await fetch('/api/themes/optimize_image', {
-            method: 'POST',
-            body: JSON.stringify({
-              image_data: l.image_data,
-              target_w: targetW,
-              target_h: targetH,
-              mode: 'fit_exact'
-            })
-          });
-          const data = await res.json();
-          if (data.success) {
-            const im = new Image();
-            await new Promise(r => { im.onload = r; im.src = data.image_data; });
-            l.image_data = data.image_data;
-            l._imgObj = im;
-            l.width = targetW;
-            l.height = targetH;
-            selectLayer(l.id);
-            drawCanvas();
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
-    // Escalar capa seleccionada (+/- %) manteniendo la proporción
-    async function scaleSelectedLayer(factor) {
-      const l = project.layers.find(x => x.id === selectedLayerId);
-      if (!l) return alert('Selecciona una capa primero.');
-      const cnt = l.count || 1;
-      const curW = Math.floor(imWidth(l) / cnt);
-      const curH = imHeight(l);
-
-      const newW = Math.max(16, Math.round(curW * factor));
-      const newH = Math.max(16, Math.round(curH * factor));
-
-      if (l.type === 0x13 && l._rawGifB64) {
-        try {
-          const res = await fetch('/api/themes/convert_gif', {
-            method: 'POST',
-            body: JSON.stringify({
-              gif_data: l._rawGifB64,
-              max_frames: l.count || 8,
-              target_w: newW,
-              target_h: newH
-            })
-          });
-          const data = await res.json();
-          if (!data.success) throw new Error(data.error);
-          const im = new Image();
-          await new Promise(r => { im.onload = r; im.src = data.strip_data; });
-          l.image_data = data.strip_data;
-          l._imgObj = im;
-          l.width = im.width;
-          l.height = im.height;
-          selectLayer(l.id);
-          drawCanvas();
-        } catch (e) {
-          alert('Error escalando GIF: ' + e.message);
-        }
-      } else {
-        try {
-          const res = await fetch('/api/themes/optimize_image', {
-            method: 'POST',
-            body: JSON.stringify({
-              image_data: l.image_data,
-              target_w: newW,
-              target_h: newH,
-              mode: 'fit_exact'
-            })
-          });
-          const data = await res.json();
-          if (!data.success) throw new Error(data.error);
-          const im = new Image();
-          await new Promise(r => { im.onload = r; im.src = data.image_data; });
-          l.image_data = data.image_data;
-          l._imgObj = im;
-          l.width = newW;
-          l.height = newH;
-          selectLayer(l.id);
-          drawCanvas();
-        } catch (e) {
-          alert('Error escalando imagen: ' + e.message);
-        }
-      }
-    }
 
     function alignSelected(pos) {
       const l = project.layers.find(x => x.id === selectedLayerId);
@@ -2460,10 +2332,14 @@ def get_studio_ui_html() -> str:
     async function fitLayerToScreen() {
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (!l) return alert('Selecciona una imagen o animación primero.');
+      const cnt = l.count || 1;
+      if (!l.orig_w) l.orig_w = l.target_w || Math.floor(imWidth(l) / cnt);
+      if (!l.orig_h) l.orig_h = l.target_h || imHeight(l);
       l.target_w = 320;
       l.target_h = 172;
       l.x = 160;
       l.y = 86;
+      l.res_pct = null;
       await applyLayerProcessing(l);
     }
 
@@ -2475,9 +2351,12 @@ def get_studio_ui_html() -> str:
       const cnt = l.count || 1;
       const curW = l.target_w || Math.floor(imWidth(l) / cnt);
       const curH = l.target_h || imHeight(l);
+      if (!l.orig_w) l.orig_w = curW;
+      if (!l.orig_h) l.orig_h = curH;
 
       if (dimension === 'w') l.target_w = numVal;
       if (dimension === 'h') l.target_h = numVal;
+      l.res_pct = null;
       await applyLayerProcessing(l);
     }
 
@@ -2488,17 +2367,59 @@ def get_studio_ui_html() -> str:
       const cnt = l.count || 1;
       const curW = l.target_w || Math.floor(imWidth(l) / cnt);
       const curH = l.target_h || imHeight(l);
+      if (!l.orig_w) l.orig_w = curW;
+      if (!l.orig_h) l.orig_h = curH;
 
       l.target_w = Math.max(16, Math.round(curW * factor));
       l.target_h = Math.max(16, Math.round(curH * factor));
+      l.res_pct = null;
       await applyLayerProcessing(l);
     }
 
-    // 4. Bajar la resolución en porcentaje (Pixel Binning) acumulativo con colores y tamaño
-    async function compressInternalResolution(resPct = 60) {
+    // 4. Cambiar la resolución en porcentaje estrictamente en base a la resolución original del GIF o imagen
+    async function compressInternalResolution(resPct = 100) {
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (!l) return alert('Selecciona una imagen o animación primero.');
-      l.res_pct = resPct;
+
+      const pct = (parseInt(resPct) || 100) / 100.0;
+      const cnt = l.count || 1;
+
+      // Obtener resolución original del archivo (GIF o imagen)
+      let origW = l.orig_w || l.orig_video_w || l._origVideoW;
+      let origH = l.orig_h || l.orig_video_h || l._origVideoH;
+
+      if (!origW || !origH) {
+        if (l._origImgObj) {
+          origW = Math.floor(l._origImgObj.width / cnt);
+          origH = l._origImgObj.height;
+        } else if (l._imgObj) {
+          origW = Math.floor(l._imgObj.width / cnt);
+          origH = l._imgObj.height;
+        } else {
+          origW = l.target_w || Math.floor((l.width || 320) / cnt);
+          origH = l.target_h || l.height || 172;
+        }
+      }
+
+      // Guardar de forma persistente la resolución nativa original
+      l.orig_w = origW;
+      l.orig_h = origH;
+      if (l.type === 0x13) {
+        l.orig_video_w = origW;
+        l.orig_video_h = origH;
+      }
+
+      // Calcular el nuevo tamaño objetivo estrictamente en base a la resolución del GIF o imagen
+      l.target_w = Math.max(16, Math.round(origW * pct));
+      l.target_h = Math.max(16, Math.round(origH * pct));
+      l.res_pct = parseInt(resPct) || 100;
+
+      // Actualizar inputs del inspector
+      const inpW = document.getElementById('inp-w');
+      const inpH = document.getElementById('inp-h');
+      if (inpW) inpW.value = l.target_w;
+      if (inpH) inpH.value = l.target_h;
+
       await applyLayerProcessing(l);
     }
 
@@ -2614,7 +2535,8 @@ def get_studio_ui_html() -> str:
               x: 160, y: 86, has_alpha: false,
               width: im.width, height: im.height,
               target_w: im.width, target_h: im.height,
-              image_data: b64, _rawImgB64: b64,
+              orig_w: im.width, orig_h: im.height,
+              image_data: b64, raw_img_b64: b64, _rawImgB64: b64,
               res_pct: 100, max_colors: 256,
               extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
             };
@@ -2629,7 +2551,8 @@ def get_studio_ui_html() -> str:
               x: 160, y: 86, has_alpha: true,
               width: im.width, height: im.height,
               target_w: im.width, target_h: im.height,
-              image_data: b64, _rawImgB64: b64,
+              orig_w: im.width, orig_h: im.height,
+              image_data: b64, raw_img_b64: b64, _rawImgB64: b64,
               res_pct: 100, max_colors: 256,
               extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
             };
@@ -2668,6 +2591,8 @@ def get_studio_ui_html() -> str:
           im.onload = () => {
             const frameW = Math.floor(im.width / data.count);
             const totalOrig = data.total_frames || data.count;
+            const origW = data.orig_w || frameW;
+            const origH = data.orig_h || im.height;
             const l = {
               id: 'layer_anim_' + Date.now(),
               name: `Animación GIF (${data.count} frames)`,
@@ -2682,15 +2607,17 @@ def get_studio_ui_html() -> str:
               height: im.height,
               target_w: frameW,
               target_h: im.height,
+              orig_w: origW,
+              orig_h: origH,
               res_pct: 100,
               max_colors: 256,
               max_frames: data.count,
               orig_frames_count: totalOrig,
               _origFramesCount: totalOrig,
-              orig_video_w: data.orig_w || frameW,
-              _origVideoW: data.orig_w || frameW,
-              orig_video_h: data.orig_h || im.height,
-              _origVideoH: data.orig_h || im.height,
+              orig_video_w: origW,
+              _origVideoW: origW,
+              orig_video_h: origH,
+              _origVideoH: origH,
               frame_duration_ms: data.duration || 100,
               total_duration_ms: data.total_duration || (totalOrig * 100),
               image_data: data.strip_data,
