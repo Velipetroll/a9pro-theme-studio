@@ -652,14 +652,108 @@ class ThemeStudioEngine:
         return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
     @staticmethod
+    def crop_layer_to_viewport(im: Image.Image, x: int, y: int, cnt: int = 1,
+                               target_w: Optional[int] = None, target_h: Optional[int] = None) -> Optional[Tuple[Image.Image, int, int]]:
+        """
+        Recorta la imagen o tira de animación para que se ajuste exactamente al viewport visible
+        de la pantalla (320x172 px), evitando enviar información de píxeles que no se van a ver.
+        Retorna (new_im, new_x, new_y) o None si la capa está completamente fuera de pantalla.
+        """
+        orig_fw = im.width // cnt if cnt > 0 else im.width
+        orig_fh = im.height
+        dw = int(target_w) if (target_w is not None and target_w > 0) else orig_fw
+        dh = int(target_h) if (target_h is not None and target_h > 0) else orig_fh
+
+        screen_x0 = x - dw // 2
+        screen_y0 = y - dh // 2
+        screen_x1 = screen_x0 + dw
+        screen_y1 = screen_y0 + dh
+
+        # Si está completamente dentro de la pantalla, no requiere recorte
+        if screen_x0 >= 0 and screen_y0 >= 0 and screen_x1 <= 320 and screen_y1 <= 172:
+            return im, x, y
+
+        # Intersección con los límites visibles de la pantalla (320x172)
+        vis_x0 = max(0, screen_x0)
+        vis_y0 = max(0, screen_y0)
+        vis_x1 = min(320, screen_x1)
+        vis_y1 = min(172, screen_y1)
+
+        # Si está completamente fuera de la pantalla
+        if vis_x1 <= vis_x0 or vis_y1 <= vis_y0:
+            return None
+
+        new_dw = vis_x1 - vis_x0
+        new_dh = vis_y1 - vis_y0
+        new_x = vis_x0 + new_dw // 2
+        new_y = vis_y0 + new_dh // 2
+
+        scale_x = orig_fw / float(dw)
+        scale_y = orig_fh / float(dh)
+
+        crop_x0 = max(0, min(orig_fw - 1, int(round((vis_x0 - screen_x0) * scale_x))))
+        crop_y0 = max(0, min(orig_fh - 1, int(round((vis_y0 - screen_y0) * scale_y))))
+        crop_x1 = max(crop_x0 + 1, min(orig_fw, int(round((vis_x1 - screen_x0) * scale_x))))
+        crop_y1 = max(crop_y0 + 1, min(orig_fh, int(round((vis_y1 - screen_y0) * scale_y))))
+
+        crop_fw = crop_x1 - crop_x0
+        crop_fh = crop_y1 - crop_y0
+
+        new_strip = Image.new("RGBA", (crop_fw * cnt, crop_fh), (0, 0, 0, 0))
+        for i in range(cnt):
+            frame = im.crop((i * orig_fw + crop_x0, crop_y0, i * orig_fw + crop_x1, crop_y1))
+            new_strip.paste(frame, (i * crop_fw, 0))
+
+        return new_strip, new_x, new_y
+
+    @staticmethod
     def compile_project(layers_data: List[Dict[str, Any]]) -> Tuple[bytes, Dict[str, Any]]:
         """Compila capas interactivas a un archivo .bin con compresión PA y deduplicación de chunks."""
         import hashlib
 
         # Filtrar capas visibles
-        active_layers = [l for l in layers_data if l.get("visible", True)]
+        active_layers = [dict(l) for l in layers_data if l.get("visible", True)]
         if not active_layers:
             raise ValueError("No hay capas visibles para compilar.")
+
+        # Recortar solo al compilar/enviar las capas que se salen del área visible (320x172),
+        # sin alterar las capas en el personalizador visual.
+        cropped_active_layers = []
+        for l in active_layers:
+            # Excluir capas de fecha/reloj en mode=4 (dígitos numéricos) ya que son tiras de glifos 0..9
+            if l.get("mode") == 4 or l.get("type") in (1, 2, 3, 4, 5, 6, 7):
+                cropped_active_layers.append(l)
+                continue
+
+            try:
+                img_b64 = l["image_data"].split(",", 1)[-1]
+                im = Image.open(io.BytesIO(base64.b64decode(img_b64)))
+                cnt = l.get("count", 1)
+                crop_res = ThemeStudioEngine.crop_layer_to_viewport(
+                    im,
+                    int(l.get("x", 160)),
+                    int(l.get("y", 86)),
+                    cnt=cnt,
+                    target_w=l.get("target_w"),
+                    target_h=l.get("target_h")
+                )
+                if crop_res is None:
+                    # Capa 100% fuera de pantalla: omitir
+                    continue
+                crop_im, nx, ny = crop_res
+                buf = io.BytesIO()
+                crop_im.save(buf, format="PNG")
+                l_copy = dict(l)
+                l_copy["image_data"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+                l_copy["x"] = nx
+                l_copy["y"] = ny
+                cropped_active_layers.append(l_copy)
+            except Exception:
+                cropped_active_layers.append(l)
+
+        active_layers = cropped_active_layers
+        if not active_layers:
+            raise ValueError("Todas las capas están fuera del área visible de la pantalla.")
 
         # Generar thumbnail automático (type=0x11, 204x112) si no existe
         has_thumb = any(l["type"] == 0x11 for l in active_layers)
@@ -673,17 +767,14 @@ class ThemeStudioEngine:
                     cnt = l.get("count", 1)
                     fw = im.width // cnt if cnt > 0 else im.width
                     fh = im.height
-                    dw = l.get("target_w") or fw
-                    dh = l.get("target_h") or fh
                     x, y = l["x"], l["y"]
-                    f0 = im.crop((0, 0, fw, fh))
-                    if dw != fw or dh != fh:
-                        f0 = f0.resize((dw, dh), Image.Resampling.NEAREST)
                     if l["type"] in (2, 3, 5, 6, 7) and l["mode"] == 4:
-                        canvas.alpha_composite(f0, (int(x - dw), int(y - dh // 2)))
-                        canvas.alpha_composite(f0, (int(x), int(y - dh // 2)))
+                        f0 = im.crop((0, 0, fw, fh))
+                        canvas.alpha_composite(f0, (int(x - fw), int(y - fh // 2)))
+                        canvas.alpha_composite(f0, (int(x), int(y - fh // 2)))
                     else:
-                        canvas.alpha_composite(f0, (int(x - dw // 2), int(y - dh // 2)))
+                        f0 = im.crop((0, 0, fw, fh))
+                        canvas.alpha_composite(f0, (int(x - fw // 2), int(y - fh // 2)))
                 except Exception:
                     pass
 
@@ -2441,9 +2532,7 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
-        const dw = l.target_w || fw;
-        const dh = l.target_h || fh;
-        if (mx >= l.x - dw / 2 && mx <= l.x + dw / 2 && my >= l.y - dh / 2 && my <= l.y + dh / 2) {
+        if (mx >= l.x - fw / 2 && mx <= l.x + fw / 2 && my >= l.y - fh / 2 && my <= l.y + fh / 2) {
           selectLayer(l.id);
           isDragging = true;
           dragStartX = mx;
