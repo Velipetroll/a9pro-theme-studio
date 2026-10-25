@@ -523,21 +523,15 @@ class ThemeStudioEngine:
     def _resample_internal_resolution(img: Image.Image, res_pct: int = 100,
                                      base_w: Optional[int] = None, base_h: Optional[int] = None) -> Image.Image:
         """
-        Reduce la resolución interna de renderizado en porcentaje atado a la resolución del video/imagen original,
-        reescalando con interpolación al tamaño de capa final (Pixel Binning proporcional al video original).
+        Reduce la resolución real de la imagen/fotograma en porcentaje,
+        disminuyendo drásticamente el tamaño del archivo binario y de la tira de sprites.
         """
-        if res_pct >= 100 or res_pct <= 10:
+        if res_pct >= 100 or res_pct <= 5:
             return img
         curr_w, curr_h = img.size
-        # Usar la resolución base del video/imagen original si se provee, o el tamaño actual
-        ref_w = base_w if base_w and base_w > 0 else curr_w
-        ref_h = base_h if base_h and base_h > 0 else curr_h
-        small_w = max(16, int(round(ref_w * res_pct / 100.0)))
-        small_h = max(16, int(round(ref_h * res_pct / 100.0)))
-        # Submuestrear a la resolución del video reducida
-        small = img.resize((small_w, small_h), Image.Resampling.BILINEAR)
-        # Re-escalar al tamaño de destino en pantalla
-        return small.resize((curr_w, curr_h), Image.Resampling.NEAREST)
+        new_w = max(16, int(round(curr_w * res_pct / 100.0)))
+        new_h = max(16, int(round(curr_h * res_pct / 100.0)))
+        return img.resize((new_w, new_h), Image.Resampling.NEAREST)
 
     @staticmethod
     def convert_gif_to_strip(gif_bytes: bytes, max_frames: int = 8, fit_screen: bool = False,
@@ -608,9 +602,9 @@ class ThemeStudioEngine:
             elif target_w and target_h:
                 frame = frame.resize((target_w, target_h), Image.Resampling.LANCZOS)
 
-            # Bajar resolución interna en porcentaje atado a la resolución del video original (Pixel Binning)
+            # Reducir resolución real en porcentaje (mantiene la escala en pantalla pero reduce drásticamente el tamaño .bin)
             if res_pct < 100:
-                frame = ThemeStudioEngine._resample_internal_resolution(frame, res_pct=res_pct, base_w=base_w, base_h=base_h)
+                frame = ThemeStudioEngine._resample_internal_resolution(frame, res_pct=res_pct)
 
             # Comprimir información de imagen (cuantización de paleta)
             if max_colors < 256:
@@ -645,9 +639,9 @@ class ThemeStudioEngine:
                 resized.paste(im, (rx, ry))
                 im = resized
 
-        # Bajar resolución interna en porcentaje atado a la resolución original de la imagen/video
+        # Reducir resolución real en porcentaje (reduce drásticamente el tamaño .bin conservando escala)
         if res_pct < 100:
-            im = ThemeStudioEngine._resample_internal_resolution(im, res_pct=res_pct, base_w=base_w, base_h=base_h)
+            im = ThemeStudioEngine._resample_internal_resolution(im, res_pct=res_pct)
 
         # Comprimir información de color reduciendo entropía para el algoritmo RLE de la caja
         if max_colors < 256:
@@ -1534,27 +1528,27 @@ def get_studio_ui_html() -> str:
                 📐 Ajustar a Pantalla Completa (320×172)
               </button>
 
-              <!-- Compresor de Resolución en % (Atado a la resolución del video original) -->
+              <!-- Reductor de Resolución (Reduce peso en KB manteniendo la escala en pantalla) -->
               <div class="space-y-1">
                 <div class="flex justify-between items-center text-[11px]">
-                  <span class="text-gray-400 font-semibold" title="Calcula la resolución interna proporcional al video original, no a la pantalla">📉 Resolución del Video %:</span>
+                  <span class="text-gray-400 font-semibold" title="Reduce la resolución real de la imagen/GIF para bajar drásticamente el peso del archivo .bin conservando su tamaño en pantalla">📉 Reducir Resolución (Ahorro KB):</span>
                   <span id="txt-res-pct-info" class="text-cyan-400 font-mono text-[10px]">100%</span>
                 </div>
                 <div class="grid grid-cols-5 gap-1 text-[11px]">
-                  <button id="btn-res-100" onclick="compressInternalResolution(100)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="100%: Resolución original del video sin pérdida">
+                  <button id="btn-res-100" onclick="compressInternalResolution(100)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="100%: Resolución nativa completa">
                     100%
                   </button>
-                  <button id="btn-res-80" onclick="compressInternalResolution(80)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="80% de la resolución del video">
-                    80%
+                  <button id="btn-res-75" onclick="compressInternalResolution(75)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="75%: Alta resolución (~35% ahorro KB)">
+                    75%
                   </button>
-                  <button id="btn-res-60" onclick="compressInternalResolution(60)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="60% de la resolución del video">
-                    60%
+                  <button id="btn-res-50" onclick="compressInternalResolution(50)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="50%: Resolución balanceada (~60% ahorro KB)">
+                    50%
                   </button>
-                  <button id="btn-res-45" onclick="compressInternalResolution(45)" class="p-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 rounded font-semibold text-amber-200 transition" title="45% de la resolución del video">
-                    45%
+                  <button id="btn-res-35" onclick="compressInternalResolution(35)" class="p-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 rounded font-semibold text-amber-200 transition" title="35%: Compresión fuerte (~78% ahorro KB)">
+                    35%
                   </button>
-                  <button id="btn-res-30" onclick="compressInternalResolution(30)" class="p-1.5 bg-red-950/60 hover:bg-red-900 border border-red-700/60 rounded font-semibold text-red-200 transition" title="30% de la resolución del video (Pixel Art)">
-                    30%
+                  <button id="btn-res-25" onclick="compressInternalResolution(25)" class="p-1.5 bg-red-950/60 hover:bg-red-900 border border-red-700/60 rounded font-semibold text-red-200 transition" title="25%: Compresión extrema (~88% ahorro KB)">
+                    25%
                   </button>
                 </div>
               </div>
@@ -2143,14 +2137,14 @@ def get_studio_ui_html() -> str:
         speedInfo.innerText = `${fDur}ms/f (${hwTicks} ticks)`;
       }
 
-      // Indicador de resolución interna atada al video
+      // Indicador de resolución real de imagen
       const curRes = l.res_pct || 100;
       const resBtns = [
         { id: 'btn-res-100', pct: 100 },
-        { id: 'btn-res-80', pct: 80 },
-        { id: 'btn-res-60', pct: 60 },
-        { id: 'btn-res-45', pct: 45 },
-        { id: 'btn-res-30', pct: 30 }
+        { id: 'btn-res-75', pct: 75 },
+        { id: 'btn-res-50', pct: 50 },
+        { id: 'btn-res-35', pct: 35 },
+        { id: 'btn-res-25', pct: 25 }
       ];
       resBtns.forEach(b => {
         const el = document.getElementById(b.id);
@@ -2164,11 +2158,10 @@ def get_studio_ui_html() -> str:
       });
       const resInfo = document.getElementById('txt-res-pct-info');
       if (resInfo) {
-        const vW = l._origVideoW || (l.width ? Math.floor(l.width / (l.count || 1)) : 320);
-        const vH = l._origVideoH || l.height || 172;
-        const effW = Math.round(vW * curRes / 100);
-        const effH = Math.round(vH * curRes / 100);
-        resInfo.innerText = `${curRes}% (${effW}×${effH} v-px)`;
+        const cnt = l.count || 1;
+        const fw = Math.floor(imWidth(l) / cnt);
+        const fh = imHeight(l);
+        resInfo.innerText = `${curRes}% (${fw}×${fh} px)`;
       }
     }
 
@@ -2178,135 +2171,6 @@ def get_studio_ui_html() -> str:
         l[axis] = parseInt(val) || 0;
         drawCanvas();
         updateLayersListUI();
-      }
-    }
-
-    // Modificar tamaño manual (ancho o alto) redimensionando la imagen/fotogramas
-    async function updateSelectedSize(dimension, val) {
-      const l = project.layers.find(x => x.id === selectedLayerId);
-      if (!l) return;
-      const numVal = parseInt(val) || 16;
-      const cnt = l.count || 1;
-      const curW = Math.floor(imWidth(l) / cnt);
-      const curH = imHeight(l);
-
-      let targetW = curW;
-      let targetH = curH;
-      if (dimension === 'w') targetW = numVal;
-      if (dimension === 'h') targetH = numVal;
-
-      if (l.type === 0x13 && l._rawGifB64) {
-        try {
-          const res = await fetch('/api/themes/convert_gif', {
-            method: 'POST',
-            body: JSON.stringify({
-              gif_data: l._rawGifB64,
-              max_frames: l.count || 8,
-              target_w: targetW,
-              target_h: targetH
-            })
-          });
-          const data = await res.json();
-          if (data.success) {
-            const im = new Image();
-            await new Promise(r => { im.onload = r; im.src = data.strip_data; });
-            l.image_data = data.strip_data;
-            l._imgObj = im;
-            l.width = im.width;
-            l.height = im.height;
-            selectLayer(l.id);
-            drawCanvas();
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        try {
-          const res = await fetch('/api/themes/optimize_image', {
-            method: 'POST',
-            body: JSON.stringify({
-              image_data: l.image_data,
-              target_w: targetW,
-              target_h: targetH,
-              mode: 'fit_exact'
-            })
-          });
-          const data = await res.json();
-          if (data.success) {
-            const im = new Image();
-            await new Promise(r => { im.onload = r; im.src = data.image_data; });
-            l.image_data = data.image_data;
-            l._imgObj = im;
-            l.width = targetW;
-            l.height = targetH;
-            selectLayer(l.id);
-            drawCanvas();
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
-    // Escalar capa seleccionada (+/- %) manteniendo la proporción
-    async function scaleSelectedLayer(factor) {
-      const l = project.layers.find(x => x.id === selectedLayerId);
-      if (!l) return alert('Selecciona una capa primero.');
-      const cnt = l.count || 1;
-      const curW = Math.floor(imWidth(l) / cnt);
-      const curH = imHeight(l);
-
-      const newW = Math.max(16, Math.round(curW * factor));
-      const newH = Math.max(16, Math.round(curH * factor));
-
-      if (l.type === 0x13 && l._rawGifB64) {
-        try {
-          const res = await fetch('/api/themes/convert_gif', {
-            method: 'POST',
-            body: JSON.stringify({
-              gif_data: l._rawGifB64,
-              max_frames: l.count || 8,
-              target_w: newW,
-              target_h: newH
-            })
-          });
-          const data = await res.json();
-          if (!data.success) throw new Error(data.error);
-          const im = new Image();
-          await new Promise(r => { im.onload = r; im.src = data.strip_data; });
-          l.image_data = data.strip_data;
-          l._imgObj = im;
-          l.width = im.width;
-          l.height = im.height;
-          selectLayer(l.id);
-          drawCanvas();
-        } catch (e) {
-          alert('Error escalando GIF: ' + e.message);
-        }
-      } else {
-        try {
-          const res = await fetch('/api/themes/optimize_image', {
-            method: 'POST',
-            body: JSON.stringify({
-              image_data: l.image_data,
-              target_w: newW,
-              target_h: newH,
-              mode: 'fit_exact'
-            })
-          });
-          const data = await res.json();
-          if (!data.success) throw new Error(data.error);
-          const im = new Image();
-          await new Promise(r => { im.onload = r; im.src = data.image_data; });
-          l.image_data = data.image_data;
-          l._imgObj = im;
-          l.width = newW;
-          l.height = newH;
-          selectLayer(l.id);
-          drawCanvas();
-        } catch (e) {
-          alert('Error escalando imagen: ' + e.message);
-        }
       }
     }
 
