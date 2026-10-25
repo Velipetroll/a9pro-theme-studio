@@ -598,7 +598,9 @@ class ThemeStudioEngine:
         frames = []
         for frame in raw_frames:
             if fit_screen:
-                frame = frame.resize((320, 172), Image.Resampling.LANCZOS)
+                # Ajuste proporcional exacto a pantalla completa (320x172) sin aplastar ni deformar (crop centrado)
+                from PIL import ImageOps
+                frame = ImageOps.fit(frame, (320, 172), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
             elif target_w and target_h:
                 frame = frame.resize((target_w, target_h), Image.Resampling.LANCZOS)
 
@@ -629,7 +631,10 @@ class ThemeStudioEngine:
         im = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         base_w, base_h = im.size
         if target_w and target_h:
-            if mode == "fit_exact":
+            if mode == "cover":
+                from PIL import ImageOps
+                im = ImageOps.fit(im, (target_w, target_h), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+            elif mode == "fit_exact":
                 im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
             elif mode == "contain":
                 resized = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
@@ -2376,6 +2381,7 @@ def get_studio_ui_html() -> str:
             body: JSON.stringify({
               gif_data: rawGif,
               max_frames: l.max_frames,
+              fit_screen: !!l.fit_screen,
               target_w: targetW,
               target_h: targetH,
               res_pct: l.res_pct,
@@ -2426,7 +2432,7 @@ def get_studio_ui_html() -> str:
               image_data: rawSrc,
               target_w: targetW,
               target_h: targetH,
-              mode: 'fit_exact',
+              mode: l.fit_screen ? 'cover' : 'fit_exact',
               res_pct: l.res_pct,
               max_colors: l.max_colors
             })
