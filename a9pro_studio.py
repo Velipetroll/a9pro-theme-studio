@@ -656,7 +656,8 @@ class ThemeStudioEngine:
                                target_w: Optional[int] = None, target_h: Optional[int] = None) -> Optional[Tuple[Image.Image, int, int]]:
         """
         Recorta la imagen o tira de animación para que se ajuste exactamente al viewport visible
-        de la pantalla (320x172 px), evitando enviar información de píxeles que no se van a ver.
+        de la pantalla (320x172 px) y adapta su resolución al tamaño visual exacto que tiene en el
+        preview del personalizador, evitando enviar píxeles no visibles y asegurando nitidez 1:1.
         Retorna (new_im, new_x, new_y) o None si la capa está completamente fuera de pantalla.
         """
         orig_fw = im.width // cnt if cnt > 0 else im.width
@@ -668,10 +669,6 @@ class ThemeStudioEngine:
         screen_y0 = y - dh // 2
         screen_x1 = screen_x0 + dw
         screen_y1 = screen_y0 + dh
-
-        # Si está completamente dentro de la pantalla, no requiere recorte
-        if screen_x0 >= 0 and screen_y0 >= 0 and screen_x1 <= 320 and screen_y1 <= 172:
-            return im, x, y
 
         # Intersección con los límites visibles de la pantalla (320x172)
         vis_x0 = max(0, screen_x0)
@@ -688,6 +685,10 @@ class ThemeStudioEngine:
         new_x = vis_x0 + new_dw // 2
         new_y = vis_y0 + new_dh // 2
 
+        # Si no hay recorte (100% dentro) y la resolución ya coincide con la escala del preview
+        if screen_x0 >= 0 and screen_y0 >= 0 and screen_x1 <= 320 and screen_y1 <= 172 and orig_fw == new_dw and orig_fh == new_dh:
+            return im, x, y
+
         scale_x = orig_fw / float(dw)
         scale_y = orig_fh / float(dh)
 
@@ -696,13 +697,13 @@ class ThemeStudioEngine:
         crop_x1 = max(crop_x0 + 1, min(orig_fw, int(round((vis_x1 - screen_x0) * scale_x))))
         crop_y1 = max(crop_y0 + 1, min(orig_fh, int(round((vis_y1 - screen_y0) * scale_y))))
 
-        crop_fw = crop_x1 - crop_x0
-        crop_fh = crop_y1 - crop_y0
-
-        new_strip = Image.new("RGBA", (crop_fw * cnt, crop_fh), (0, 0, 0, 0))
+        new_strip = Image.new("RGBA", (new_dw * cnt, new_dh), (0, 0, 0, 0))
         for i in range(cnt):
             frame = im.crop((i * orig_fw + crop_x0, crop_y0, i * orig_fw + crop_x1, crop_y1))
-            new_strip.paste(frame, (i * crop_fw, 0))
+            # Ajustar a la resolución exacta de los píxeles visibles en pantalla tal como se ve en el personalizador
+            if frame.size != (new_dw, new_dh):
+                frame = frame.resize((new_dw, new_dh), Image.Resampling.LANCZOS)
+            new_strip.paste(frame, (i * new_dw, 0))
 
         return new_strip, new_x, new_y
 
