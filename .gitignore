@@ -1,0 +1,26 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# APK Extraction & Reverse Engineering Tools (Heavy artifacts)
+arm64_apk/
+base_apk/
+extracted_xapk/
+blutter/
+blutter_out/
+extracted_385/
+
+# Ephemeral test binaries
+custom_compiled.bin
+test_*.bin
+
+# System & Editor files
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
