@@ -598,11 +598,11 @@ class ThemeStudioEngine:
         frames = []
         for frame in raw_frames:
             if fit_screen:
-                # Ajuste proporcional exacto a pantalla completa (320x172) sin aplastar ni deformar (crop centrado)
+                # Ajuste proporcional exacto a pantalla completa (320x172) sin aplastar ni deformar (crop centrado con NEAREST)
                 from PIL import ImageOps
-                frame = ImageOps.fit(frame, (320, 172), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+                frame = ImageOps.fit(frame, (320, 172), method=Image.Resampling.NEAREST, centering=(0.5, 0.5))
             elif target_w and target_h:
-                frame = frame.resize((target_w, target_h), Image.Resampling.LANCZOS)
+                frame = frame.resize((target_w, target_h), Image.Resampling.NEAREST)
 
             # Reducir resolución real en porcentaje (mantiene la escala en pantalla pero reduce drásticamente el tamaño .bin)
             if res_pct < 100:
@@ -633,12 +633,12 @@ class ThemeStudioEngine:
         if target_w and target_h:
             if mode == "cover":
                 from PIL import ImageOps
-                im = ImageOps.fit(im, (target_w, target_h), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+                im = ImageOps.fit(im, (target_w, target_h), method=Image.Resampling.NEAREST, centering=(0.5, 0.5))
             elif mode == "fit_exact":
-                im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
+                im = im.resize((target_w, target_h), Image.Resampling.NEAREST)
             elif mode == "contain":
                 resized = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-                im.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
+                im.thumbnail((target_w, target_h), Image.Resampling.NEAREST)
                 rx = (target_w - im.width) // 2
                 ry = (target_h - im.height) // 2
                 resized.paste(im, (rx, ry))
