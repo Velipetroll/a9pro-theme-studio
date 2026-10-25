@@ -656,8 +656,7 @@ class ThemeStudioEngine:
                                target_w: Optional[int] = None, target_h: Optional[int] = None) -> Optional[Tuple[Image.Image, int, int]]:
         """
         Recorta la imagen o tira de animación para que se ajuste exactamente al viewport visible
-        de la pantalla (320x172 px) y adapta su resolución al tamaño visual exacto que tiene en el
-        preview del personalizador, evitando enviar píxeles no visibles y asegurando nitidez 1:1.
+        de la pantalla (320x172 px), evitando enviar información de píxeles que no se van a ver.
         Retorna (new_im, new_x, new_y) o None si la capa está completamente fuera de pantalla.
         """
         orig_fw = im.width // cnt if cnt > 0 else im.width
@@ -669,6 +668,10 @@ class ThemeStudioEngine:
         screen_y0 = y - dh // 2
         screen_x1 = screen_x0 + dw
         screen_y1 = screen_y0 + dh
+
+        # Si está completamente dentro de la pantalla, no requiere recorte
+        if screen_x0 >= 0 and screen_y0 >= 0 and screen_x1 <= 320 and screen_y1 <= 172:
+            return im, x, y
 
         # Intersección con los límites visibles de la pantalla (320x172)
         vis_x0 = max(0, screen_x0)
@@ -685,10 +688,6 @@ class ThemeStudioEngine:
         new_x = vis_x0 + new_dw // 2
         new_y = vis_y0 + new_dh // 2
 
-        # Si no hay recorte (100% dentro) y la resolución ya coincide con la escala del preview
-        if screen_x0 >= 0 and screen_y0 >= 0 and screen_x1 <= 320 and screen_y1 <= 172 and orig_fw == new_dw and orig_fh == new_dh:
-            return im, x, y
-
         scale_x = orig_fw / float(dw)
         scale_y = orig_fh / float(dh)
 
@@ -697,13 +696,13 @@ class ThemeStudioEngine:
         crop_x1 = max(crop_x0 + 1, min(orig_fw, int(round((vis_x1 - screen_x0) * scale_x))))
         crop_y1 = max(crop_y0 + 1, min(orig_fh, int(round((vis_y1 - screen_y0) * scale_y))))
 
-        new_strip = Image.new("RGBA", (new_dw * cnt, new_dh), (0, 0, 0, 0))
+        crop_fw = crop_x1 - crop_x0
+        crop_fh = crop_y1 - crop_y0
+
+        new_strip = Image.new("RGBA", (crop_fw * cnt, crop_fh), (0, 0, 0, 0))
         for i in range(cnt):
             frame = im.crop((i * orig_fw + crop_x0, crop_y0, i * orig_fw + crop_x1, crop_y1))
-            # Ajustar a la resolución exacta de los píxeles visibles en pantalla tal como se ve en el personalizador
-            if frame.size != (new_dw, new_dh):
-                frame = frame.resize((new_dw, new_dh), Image.Resampling.LANCZOS)
-            new_strip.paste(frame, (i * new_dw, 0))
+            new_strip.paste(frame, (i * crop_fw, 0))
 
         return new_strip, new_x, new_y
 
@@ -2036,8 +2035,6 @@ def get_studio_ui_html() -> str:
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
         const fh = imHeight(layer);
-        const dw = layer.target_w || fw;
-        const dh = layer.target_h || fh;
         const x = layer.x;
         const y = layer.y;
 
@@ -2045,16 +2042,16 @@ def get_studio_ui_html() -> str:
         if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
           const d1 = (layer.type === 5) ? 0 : 2;
           const d2 = (layer.type === 5) ? 9 : 8;
-          ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
-          ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
+          ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - fw), Math.floor(y - fh / 2), fw, fh);
+          ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - fh / 2), fw, fh);
         } else if (layer.type === 0x13 && cnt > 1) {
-          // Animación GIF en bucle manteniendo la duración total exacta del video y la escala en pantalla
+          // Animación GIF en bucle a su resolución exacta
           const fDur = layer.frame_duration_ms || 120;
           const nowMs = Date.now();
           const frameIdx = Math.floor(nowMs / fDur) % cnt;
-          ctx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+          ctx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
         } else {
-          ctx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+          ctx.drawImage(img, 0, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
         }
 
         // Borde de selección
@@ -2062,7 +2059,7 @@ def get_studio_ui_html() -> str:
           ctx.strokeStyle = "#3b82f6";
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]);
-          ctx.strokeRect(Math.floor(x - dw / 2) - 1, Math.floor(y - dh / 2) - 1, dw + 2, dh + 2);
+          ctx.strokeRect(Math.floor(x - fw / 2) - 1, Math.floor(y - fh / 2) - 1, fw + 2, fh + 2);
           ctx.setLineDash([]);
         }
       });
@@ -2083,23 +2080,21 @@ def get_studio_ui_html() -> str:
           const cnt = layer.count || 1;
           const fw = Math.floor(imWidth(layer) / cnt);
           const fh = imHeight(layer);
-          const dw = layer.target_w || fw;
-          const dh = layer.target_h || fh;
           const x = layer.x;
           const y = layer.y;
 
           if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
             const d1 = (layer.type === 5) ? 0 : 2;
             const d2 = (layer.type === 5) ? 9 : 8;
-            bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
-            bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
+            bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - fw), Math.floor(y - fh / 2), fw, fh);
+            bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - fh / 2), fw, fh);
           } else if (layer.type === 0x13 && cnt > 1) {
             const fDur = layer.frame_duration_ms || 120;
             const nowMs = Date.now();
             const frameIdx = Math.floor(nowMs / fDur) % cnt;
-            bCtx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+            bCtx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
           } else {
-            bCtx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+            bCtx.drawImage(img, 0, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
           }
         });
       }
@@ -2167,12 +2162,12 @@ def get_studio_ui_html() -> str:
         const dh = l.target_h || fh;
         const inpW = document.getElementById('inp-w');
         const inpH = document.getElementById('inp-h');
-        if (inpW) inpW.value = dw;
-        if (inpH) inpH.value = dh;
+        if (inpW) inpW.value = fw;
+        if (inpH) inpH.value = fh;
 
         const dimsEl = document.getElementById('txt-layer-dims');
         if (dimsEl) {
-          dimsEl.innerText = (cnt > 1) ? `${dw}×${dh} (${cnt}f)` : `${dw}×${dh} px`;
+          dimsEl.innerText = (cnt > 1) ? `${fw}×${fh} (${cnt}f)` : `${fw}×${fh} px`;
         }
         const gifOpt = document.getElementById('gif-compress-options');
         if (gifOpt) {
@@ -2262,9 +2257,7 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
-        const dw = l.target_w || fw;
-        const dh = l.target_h || fh;
-        resInfo.innerText = `${curRes}% (${fw}×${fh} px guardados → escala ${dw}×${dh} px)`;
+        resInfo.innerText = `${curRes}% (${fw}×${fh} px)`;
       }
     }
 
@@ -2283,18 +2276,16 @@ def get_studio_ui_html() -> str:
       const cnt = l.count || 1;
       const fw = Math.floor(imWidth(l) / cnt);
       const fh = imHeight(l);
-      const dw = l.target_w || fw;
-      const dh = l.target_h || fh;
 
       if (pos === 'center') { l.x = 160; l.y = 86; }
-      else if (pos === 'top-left') { l.x = Math.floor(dw / 2) + 6; l.y = Math.floor(dh / 2) + 6; }
-      else if (pos === 'top-center') { l.x = 160; l.y = Math.floor(dh / 2) + 6; }
-      else if (pos === 'top-right') { l.x = 320 - Math.floor(dw / 2) - 6; l.y = Math.floor(dh / 2) + 6; }
-      else if (pos === 'mid-left') { l.x = Math.floor(dw / 2) + 6; l.y = 86; }
-      else if (pos === 'mid-right') { l.x = 320 - Math.floor(dw / 2) - 6; l.y = 86; }
-      else if (pos === 'bottom-left') { l.x = Math.floor(dw / 2) + 6; l.y = 172 - Math.floor(dh / 2) - 6; }
-      else if (pos === 'bottom-center') { l.x = 160; l.y = 172 - Math.floor(dh / 2) - 6; }
-      else if (pos === 'bottom-right') { l.x = 320 - Math.floor(dw / 2) - 6; l.y = 172 - Math.floor(dh / 2) - 6; }
+      else if (pos === 'top-left') { l.x = Math.floor(fw / 2) + 6; l.y = Math.floor(fh / 2) + 6; }
+      else if (pos === 'top-center') { l.x = 160; l.y = Math.floor(fh / 2) + 6; }
+      else if (pos === 'top-right') { l.x = 320 - Math.floor(fw / 2) - 6; l.y = Math.floor(fh / 2) + 6; }
+      else if (pos === 'mid-left') { l.x = Math.floor(fw / 2) + 6; l.y = 86; }
+      else if (pos === 'mid-right') { l.x = 320 - Math.floor(fw / 2) - 6; l.y = 86; }
+      else if (pos === 'bottom-left') { l.x = Math.floor(fw / 2) + 6; l.y = 172 - Math.floor(fh / 2) - 6; }
+      else if (pos === 'bottom-center') { l.x = 160; l.y = 172 - Math.floor(fh / 2) - 6; }
+      else if (pos === 'bottom-right') { l.x = 320 - Math.floor(fw / 2) - 6; l.y = 172 - Math.floor(fh / 2) - 6; }
 
       document.getElementById('inp-x').value = l.x;
       document.getElementById('inp-y').value = l.y;
