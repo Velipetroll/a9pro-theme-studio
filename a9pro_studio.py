@@ -673,14 +673,17 @@ class ThemeStudioEngine:
                     cnt = l.get("count", 1)
                     fw = im.width // cnt if cnt > 0 else im.width
                     fh = im.height
+                    dw = l.get("target_w") or fw
+                    dh = l.get("target_h") or fh
                     x, y = l["x"], l["y"]
+                    f0 = im.crop((0, 0, fw, fh))
+                    if dw != fw or dh != fh:
+                        f0 = f0.resize((dw, dh), Image.Resampling.NEAREST)
                     if l["type"] in (2, 3, 5, 6, 7) and l["mode"] == 4:
-                        f0 = im.crop((0, 0, fw, fh))
-                        canvas.alpha_composite(f0, (int(x - fw), int(y - fh // 2)))
-                        canvas.alpha_composite(f0, (int(x), int(y - fh // 2)))
+                        canvas.alpha_composite(f0, (int(x - dw), int(y - dh // 2)))
+                        canvas.alpha_composite(f0, (int(x), int(y - dh // 2)))
                     else:
-                        f0 = im.crop((0, 0, fw, fh))
-                        canvas.alpha_composite(f0, (int(x - fw // 2), int(y - fh // 2)))
+                        canvas.alpha_composite(f0, (int(x - dw // 2), int(y - dh // 2)))
                 except Exception:
                     pass
 
@@ -1941,6 +1944,8 @@ def get_studio_ui_html() -> str:
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
         const fh = imHeight(layer);
+        const dw = layer.target_w || fw;
+        const dh = layer.target_h || fh;
         const x = layer.x;
         const y = layer.y;
 
@@ -1948,16 +1953,16 @@ def get_studio_ui_html() -> str:
         if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
           const d1 = (layer.type === 5) ? 0 : 2;
           const d2 = (layer.type === 5) ? 9 : 8;
-          ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - fw), Math.floor(y - fh / 2), fw, fh);
-          ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - fh / 2), fw, fh);
+          ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
+          ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
         } else if (layer.type === 0x13 && cnt > 1) {
-          // Animación GIF en bucle manteniendo la duración total exacta del video
+          // Animación GIF en bucle manteniendo la duración total exacta del video y la escala en pantalla
           const fDur = layer.frame_duration_ms || 120;
           const nowMs = Date.now();
           const frameIdx = Math.floor(nowMs / fDur) % cnt;
-          ctx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+          ctx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
         } else {
-          ctx.drawImage(img, 0, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+          ctx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
         }
 
         // Borde de selección
@@ -1965,7 +1970,7 @@ def get_studio_ui_html() -> str:
           ctx.strokeStyle = "#3b82f6";
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]);
-          ctx.strokeRect(Math.floor(x - fw / 2) - 1, Math.floor(y - fh / 2) - 1, fw + 2, fh + 2);
+          ctx.strokeRect(Math.floor(x - dw / 2) - 1, Math.floor(y - dh / 2) - 1, dw + 2, dh + 2);
           ctx.setLineDash([]);
         }
       });
@@ -1986,21 +1991,23 @@ def get_studio_ui_html() -> str:
           const cnt = layer.count || 1;
           const fw = Math.floor(imWidth(layer) / cnt);
           const fh = imHeight(layer);
+          const dw = layer.target_w || fw;
+          const dh = layer.target_h || fh;
           const x = layer.x;
           const y = layer.y;
 
           if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
             const d1 = (layer.type === 5) ? 0 : 2;
             const d2 = (layer.type === 5) ? 9 : 8;
-            bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - fw), Math.floor(y - fh / 2), fw, fh);
-            bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - fh / 2), fw, fh);
+            bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
+            bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
           } else if (layer.type === 0x13 && cnt > 1) {
             const fDur = layer.frame_duration_ms || 120;
             const nowMs = Date.now();
             const frameIdx = Math.floor(nowMs / fDur) % cnt;
-            bCtx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+            bCtx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
           } else {
-            bCtx.drawImage(img, 0, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+            bCtx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
           }
         });
       }
@@ -2064,14 +2071,16 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
+        const dw = l.target_w || fw;
+        const dh = l.target_h || fh;
         const inpW = document.getElementById('inp-w');
         const inpH = document.getElementById('inp-h');
-        if (inpW) inpW.value = fw;
-        if (inpH) inpH.value = fh;
+        if (inpW) inpW.value = dw;
+        if (inpH) inpH.value = dh;
 
         const dimsEl = document.getElementById('txt-layer-dims');
         if (dimsEl) {
-          dimsEl.innerText = (cnt > 1) ? `${fw}×${fh} (${cnt}f)` : `${fw}×${fh} px`;
+          dimsEl.innerText = (cnt > 1) ? `${dw}×${dh} (${cnt}f)` : `${dw}×${dh} px`;
         }
         const gifOpt = document.getElementById('gif-compress-options');
         if (gifOpt) {
@@ -2161,7 +2170,9 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
-        resInfo.innerText = `${curRes}% (${fw}×${fh} px)`;
+        const dw = l.target_w || fw;
+        const dh = l.target_h || fh;
+        resInfo.innerText = `${curRes}% (${fw}×${fh} px guardados → escala ${dw}×${dh} px)`;
       }
     }
 
@@ -2180,16 +2191,18 @@ def get_studio_ui_html() -> str:
       const cnt = l.count || 1;
       const fw = Math.floor(imWidth(l) / cnt);
       const fh = imHeight(l);
+      const dw = l.target_w || fw;
+      const dh = l.target_h || fh;
 
       if (pos === 'center') { l.x = 160; l.y = 86; }
-      else if (pos === 'top-left') { l.x = Math.floor(fw / 2) + 6; l.y = Math.floor(fh / 2) + 6; }
-      else if (pos === 'top-center') { l.x = 160; l.y = Math.floor(fh / 2) + 6; }
-      else if (pos === 'top-right') { l.x = 320 - Math.floor(fw / 2) - 6; l.y = Math.floor(fh / 2) + 6; }
-      else if (pos === 'mid-left') { l.x = Math.floor(fw / 2) + 6; l.y = 86; }
-      else if (pos === 'mid-right') { l.x = 320 - Math.floor(fw / 2) - 6; l.y = 86; }
-      else if (pos === 'bottom-left') { l.x = Math.floor(fw / 2) + 6; l.y = 172 - Math.floor(fh / 2) - 6; }
-      else if (pos === 'bottom-center') { l.x = 160; l.y = 172 - Math.floor(fh / 2) - 6; }
-      else if (pos === 'bottom-right') { l.x = 320 - Math.floor(fw / 2) - 6; l.y = 172 - Math.floor(fh / 2) - 6; }
+      else if (pos === 'top-left') { l.x = Math.floor(dw / 2) + 6; l.y = Math.floor(dh / 2) + 6; }
+      else if (pos === 'top-center') { l.x = 160; l.y = Math.floor(dh / 2) + 6; }
+      else if (pos === 'top-right') { l.x = 320 - Math.floor(dw / 2) - 6; l.y = Math.floor(dh / 2) + 6; }
+      else if (pos === 'mid-left') { l.x = Math.floor(dw / 2) + 6; l.y = 86; }
+      else if (pos === 'mid-right') { l.x = 320 - Math.floor(dw / 2) - 6; l.y = 86; }
+      else if (pos === 'bottom-left') { l.x = Math.floor(dw / 2) + 6; l.y = 172 - Math.floor(dh / 2) - 6; }
+      else if (pos === 'bottom-center') { l.x = 160; l.y = 172 - Math.floor(dh / 2) - 6; }
+      else if (pos === 'bottom-right') { l.x = 320 - Math.floor(dw / 2) - 6; l.y = 172 - Math.floor(dh / 2) - 6; }
 
       document.getElementById('inp-x').value = l.x;
       document.getElementById('inp-y').value = l.y;
@@ -2428,7 +2441,9 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
-        if (mx >= l.x - fw / 2 && mx <= l.x + fw / 2 && my >= l.y - fh / 2 && my <= l.y + fh / 2) {
+        const dw = l.target_w || fw;
+        const dh = l.target_h || fh;
+        if (mx >= l.x - dw / 2 && mx <= l.x + dw / 2 && my >= l.y - dh / 2 && my <= l.y + dh / 2) {
           selectLayer(l.id);
           isDragging = true;
           dragStartX = mx;
