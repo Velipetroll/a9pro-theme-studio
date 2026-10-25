@@ -626,17 +626,18 @@ class ThemeStudioEngine:
 
     @staticmethod
     def optimize_image(img_bytes: bytes, target_w: Optional[int] = None, target_h: Optional[int] = None,
-                       mode: str = "fit_exact", max_colors: int = 64, res_pct: int = 100) -> str:
+                       mode: str = "fit_exact", max_colors: int = 64, res_pct: int = 100, count: int = 1) -> str:
         """Comprime la información de la imagen ajustando resolución interna en porcentaje atado a la resolución original."""
         im = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        base_w, base_h = im.size
+        cnt = max(1, count)
         if target_w and target_h:
+            eff_w = target_w * cnt
             if mode == "fit_exact":
-                im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
+                im = im.resize((eff_w, target_h), Image.Resampling.LANCZOS)
             elif mode == "contain":
-                resized = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-                im.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
-                rx = (target_w - im.width) // 2
+                resized = Image.new("RGBA", (eff_w, target_h), (0, 0, 0, 0))
+                im.thumbnail((eff_w, target_h), Image.Resampling.LANCZOS)
+                rx = (eff_w - im.width) // 2
                 ry = (target_h - im.height) // 2
                 resized.paste(im, (rx, ry))
                 im = resized
@@ -966,6 +967,7 @@ class StudioHTTPHandler(BaseHTTPRequestHandler):
             mode = req.get("mode", "fit_exact")
             max_colors = int(req.get("max_colors", 64))
             res_pct = int(req.get("res_pct", 100))
+            count = int(req.get("count", 1))
             try:
                 img_bytes = base64.b64decode(img_b64)
                 res_b64 = studio_engine.optimize_image(
@@ -974,7 +976,8 @@ class StudioHTTPHandler(BaseHTTPRequestHandler):
                     target_h=int(target_h) if target_h else None,
                     mode=mode,
                     max_colors=max_colors,
-                    res_pct=res_pct
+                    res_pct=res_pct,
+                    count=count
                 )
                 self._send_json({"success": True, "image_data": res_b64})
             except Exception as e:
@@ -2330,7 +2333,8 @@ def get_studio_ui_html() -> str:
               target_h: targetH,
               mode: 'fit_exact',
               res_pct: l.res_pct,
-              max_colors: l.max_colors
+              max_colors: l.max_colors,
+              count: cnt
             })
           });
           const data = await res.json();
@@ -2342,8 +2346,8 @@ def get_studio_ui_html() -> str:
           l._imgObj = im;
           l.target_w = targetW;
           l.target_h = targetH;
-          l.width = targetW;
-          l.height = targetH;
+          l.width = im.width;
+          l.height = im.height;
           selectLayer(l.id);
           drawCanvas();
         } catch (e) {
