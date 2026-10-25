@@ -2036,23 +2036,25 @@ def get_studio_ui_html() -> str:
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
         const fh = imHeight(layer);
-        const x = layer.x;
-        const y = layer.y;
+        const dw = layer.fit_screen ? 320 : (layer.target_w || fw);
+        const dh = layer.fit_screen ? 172 : (layer.target_h || fh);
+        const x = layer.fit_screen ? 160 : layer.x;
+        const y = layer.fit_screen ? 86 : layer.y;
 
         // Horas y Minutos (type 5 y 6, mode 4) -> 2 dígitos
         if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
           const d1 = (layer.type === 5) ? 0 : 2;
           const d2 = (layer.type === 5) ? 9 : 8;
-          ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - fw), Math.floor(y - fh / 2), fw, fh);
-          ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - fh / 2), fw, fh);
+          ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
+          ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
         } else if (layer.type === 0x13 && cnt > 1) {
-          // Animación GIF en bucle a su resolución exacta
+          // Animación GIF en bucle
           const fDur = layer.frame_duration_ms || 120;
           const nowMs = Date.now();
           const frameIdx = Math.floor(nowMs / fDur) % cnt;
-          ctx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+          ctx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
         } else {
-          ctx.drawImage(img, 0, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+          ctx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
         }
 
         // Borde de selección
@@ -2060,7 +2062,7 @@ def get_studio_ui_html() -> str:
           ctx.strokeStyle = "#3b82f6";
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]);
-          ctx.strokeRect(Math.floor(x - fw / 2) - 1, Math.floor(y - fh / 2) - 1, fw + 2, fh + 2);
+          ctx.strokeRect(Math.floor(x - dw / 2) - 1, Math.floor(y - dh / 2) - 1, dw + 2, dh + 2);
           ctx.setLineDash([]);
         }
       });
@@ -2081,21 +2083,23 @@ def get_studio_ui_html() -> str:
           const cnt = layer.count || 1;
           const fw = Math.floor(imWidth(layer) / cnt);
           const fh = imHeight(layer);
-          const x = layer.x;
-          const y = layer.y;
+          const dw = layer.fit_screen ? 320 : (layer.target_w || fw);
+          const dh = layer.fit_screen ? 172 : (layer.target_h || fh);
+          const x = layer.fit_screen ? 160 : layer.x;
+          const y = layer.fit_screen ? 86 : layer.y;
 
           if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
             const d1 = (layer.type === 5) ? 0 : 2;
             const d2 = (layer.type === 5) ? 9 : 8;
-            bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - fw), Math.floor(y - fh / 2), fw, fh);
-            bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - fh / 2), fw, fh);
+            bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
+            bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
           } else if (layer.type === 0x13 && cnt > 1) {
             const fDur = layer.frame_duration_ms || 120;
             const nowMs = Date.now();
             const frameIdx = Math.floor(nowMs / fDur) % cnt;
-            bCtx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+            bCtx.drawImage(img, frameIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
           } else {
-            bCtx.drawImage(img, 0, 0, fw, fh, Math.floor(x - fw / 2), Math.floor(y - fh / 2), fw, fh);
+            bCtx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
           }
         });
       }
@@ -2168,7 +2172,11 @@ def get_studio_ui_html() -> str:
 
         const dimsEl = document.getElementById('txt-layer-dims');
         if (dimsEl) {
-          dimsEl.innerText = (cnt > 1) ? `${fw}×${fh} (${cnt}f)` : `${fw}×${fh} px`;
+          if (l.fit_screen) {
+            dimsEl.innerText = (cnt > 1) ? `320×172 (${fw}×${fh} res, ${cnt}f)` : `320×172 (${fw}×${fh} res)`;
+          } else {
+            dimsEl.innerText = (cnt > 1) ? `${fw}×${fh} (${cnt}f)` : `${fw}×${fh} px`;
+          }
         }
         const gifOpt = document.getElementById('gif-compress-options');
         if (gifOpt) {
@@ -2557,7 +2565,11 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
-        if (mx >= l.x - fw / 2 && mx <= l.x + fw / 2 && my >= l.y - fh / 2 && my <= l.y + fh / 2) {
+        const dw = l.fit_screen ? 320 : (l.target_w || fw);
+        const dh = l.fit_screen ? 172 : (l.target_h || fh);
+        const lx = l.fit_screen ? 160 : l.x;
+        const ly = l.fit_screen ? 86 : l.y;
+        if (mx >= lx - dw / 2 && mx <= lx + dw / 2 && my >= ly - dh / 2 && my <= ly + dh / 2) {
           selectLayer(l.id);
           isDragging = true;
           dragStartX = mx;
