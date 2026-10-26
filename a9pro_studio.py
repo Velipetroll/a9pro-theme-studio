@@ -60,7 +60,7 @@ class A9ProDeviceManager:
     def __init__(self, mac: str = DEFAULT_BOX_MAC):
         self.mac = mac
         self.client: Optional[tool.A9ProL2CAPClient] = None
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.connected = False
         self.listener_thread: Optional[threading.Thread] = None
         self.stop_event = threading.Event()
@@ -294,10 +294,11 @@ class A9ProDeviceManager:
         mask = (1 if left else 0) | (2 if right else 0)
         return self.send_raw_command(0x37, bytes([mask]))
 
-    def sync_time(self, offset_hours: float = -10.0) -> bool:
+    def sync_time(self, offset_hours: float = -13.0) -> bool:
         # Compensación del desfase del RTC en el firmware JieLi:
-        # El MCU A9 Pro añade +5h a la marca de tiempo UTC (+10h respecto a hora local UTC-5).
-        # Aplicamos offset_hours (por defecto -10h) para sincronizar exactamente con la hora local.
+        # El firmware de la caja A9 Pro suma automáticamente +8h (Beijing / CST) a la marca de tiempo recibida.
+        # En Colombia/Perú (UTC-5), el desfase total respecto al reloj de la caja es de -13h (+8h - (-5h) = 13h).
+        # Aplicamos offset_hours (por defecto -13h) para sincronizar exactamente con la hora local.
         target_ts = int(time.time() + (offset_hours * 3600))
         payload = struct.pack("<I", target_ts)
         local_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -1050,7 +1051,7 @@ class StudioHTTPHandler(BaseHTTPRequestHandler):
             ok = device_mgr.find_earbuds(left, right)
             self._send_json({"success": ok})
         elif path == "/api/control/sync_time":
-            offset_hours = float(req.get("offset_hours", -10.0))
+            offset_hours = float(req.get("offset_hours", -13.0))
             ok = device_mgr.sync_time(offset_hours=offset_hours)
             self._send_json({"success": ok, "offset_hours": offset_hours})
         elif path == "/api/themes/render_strip":
@@ -1352,12 +1353,14 @@ def get_studio_ui_html() -> str:
           <div class="flex items-center bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 gap-2">
             <span class="text-xs text-gray-300">Ajuste RTC:</span>
             <select id="sel-time-offset" class="bg-gray-900 text-xs text-amber-400 font-semibold px-2 py-1 rounded border border-gray-700 focus:outline-none">
-              <option value="-10" selected>-10h (Colombia / UTC-5 Exacta)</option>
-              <option value="-9">-9h</option>
-              <option value="-11">-11h</option>
-              <option value="-5">-5h (UTC sin compensar)</option>
-              <option value="0">0h (UTC puro)</option>
+              <option value="-13" selected>-13h (Colombia / UTC-5 Exacta)</option>
+              <option value="-14">-14h (UTC-6)</option>
+              <option value="-12">-12h (UTC-4)</option>
+              <option value="-11">-11h (UTC-3)</option>
               <option value="-15">-15h</option>
+              <option value="-10">-10h</option>
+              <option value="-8">-8h (CST compensado)</option>
+              <option value="0">0h (UTC puro / China)</option>
             </select>
             <button onclick="syncTime()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-semibold rounded shadow transition flex items-center gap-1.5">
               🕒 Sincronizar Reloj Caja
@@ -2042,7 +2045,7 @@ def get_studio_ui_html() -> str:
 
     async function syncTime() {
       const sel = document.getElementById('sel-time-offset');
-      const offset = sel ? parseFloat(sel.value) : -10.0;
+      const offset = sel ? parseFloat(sel.value) : -13.0;
       try {
         const res = await fetch('/api/control/sync_time', {
           method: 'POST',
@@ -2051,7 +2054,7 @@ def get_studio_ui_html() -> str:
         });
         const data = await res.json();
         if (data.success) {
-          showToast("Reloj Sincronizado", `Hora local sincronizada con la caja (ajuste: ${offset}h) 🕒`, "🕒", true);
+          showToast("Reloj Sincronizado", `Hora local enviada (ajuste: ${offset}h). Si la pantalla no cambia al instante, apágala y préndela o desliza entre pantallas para refrescar dígitos. 🕒`, "🕒", true);
         } else {
           alert("No se pudo sincronizar el reloj. Asegúrate de encender la pantalla de la caja para que el Bluetooth responda.");
         }

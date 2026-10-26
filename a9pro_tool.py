@@ -774,9 +774,11 @@ class A9ProL2CAPClient:
         finally:
             self.close()
 
-    def sync_time(self, offset_hours: float = -10.0) -> bool:
+    def sync_time(self, offset_hours: float = -13.0) -> bool:
         self.connect()
         try:
+            # El firmware JieLi de la caja A9 Pro suma internamente +8h (Beijing / CST).
+            # Para hora de Colombia / Perú (UTC-5), el desfase respecto al firmware es -13h (+8h - (-5h) = 13h).
             target_ts = int(time.time() + (offset_hours * 3600))
             payload = struct.pack("<I", target_ts)
             cmd_pkt = self.build_cmd(CMD_TIMESTAMP, payload)
@@ -956,6 +958,12 @@ def main():
     # Subcomando: time
     p_time = sub.add_parser("time", help="Sincroniza la fecha y hora de tu PC con la caja A9 Pro Box")
     p_time.add_argument("--mac", default=DEFAULT_MAC, help=f"Dirección MAC (por defecto {DEFAULT_MAC})")
+    p_time.add_argument(
+        "--offset",
+        type=float,
+        default=-13.0,
+        help="Desfase horario en horas (por defecto -13.0 para Colombia/UTC-5 respecto a Beijing UTC+8)",
+    )
 
     # Subcomando: build
     p_build = sub.add_parser("build", help="Construye un archivo de tema .bin personalizado sin límites de la app")
@@ -1002,7 +1010,7 @@ def main():
         client.query_info()
     elif args.cmd == "time":
         client = A9ProL2CAPClient(address=args.mac)
-        client.sync_time()
+        client.sync_time(offset_hours=args.offset)
     elif args.cmd == "build":
         bin_bytes = build_custom_dial_bin(
             bg_path=args.bg,
