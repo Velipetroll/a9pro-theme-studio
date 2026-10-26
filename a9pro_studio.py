@@ -285,9 +285,15 @@ class A9ProDeviceManager:
         return self.send_raw_command(0x37, bytes([mask]))
 
     def sync_time(self) -> bool:
-        now = time.time()
-        tz_offset = -int(time.timezone / 3600)
-        payload = struct.pack(">Ii", int(now), tz_offset)
+        now = time.localtime()
+        payload = bytes([
+            now.tm_year % 100,
+            now.tm_mon,
+            now.tm_mday,
+            now.tm_hour,
+            now.tm_min,
+            now.tm_sec,
+        ])
         return self.send_raw_command(0x93, payload)
 
     def upload_theme_async(self, bin_data: bytes) -> None:
@@ -327,10 +333,11 @@ class A9ProDeviceManager:
                 self.upload_state["error"] = str(e)
             finally:
                 self.upload_state["active"] = False
-                # Reconectar cliente regular
+                # Reconectar cliente regular y sincronizar reloj automáticamente
                 time.sleep(1.0)
                 try:
-                    self.connect()
+                    if self.connect():
+                        self.sync_time()
                 except Exception:
                     pass
 
