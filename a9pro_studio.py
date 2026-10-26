@@ -441,13 +441,19 @@ class ThemeStudioEngine:
     def render_digit_strip(font_size: int = 50, color_hex: str = "#FFFFFF",
                            stroke_w: int = 2, stroke_hex: str = "#000000",
                            font_family: str = "opensans") -> str:
-        """Genera una tira de 10 dígitos (0..9) en formato PNG con soporte de borde y sombra."""
+        """Genera una tira de 10 dígitos (0..9) en formato PNG con posicionamiento preciso sin recortes."""
         font = ThemeStudioEngine._get_font(font_family, font_size)
 
-        # Medir dígito '0'
-        bbox = font.getbbox("0")
-        dw = (bbox[2] - bbox[0]) + stroke_w * 2 + 10
-        dh = (bbox[3] - bbox[1]) + stroke_w * 2 + 8
+        # Calcular dimensiones máximas de todos los dígitos (0..9)
+        max_w = 0
+        max_h = 0
+        for d in range(10):
+            b = font.getbbox(str(d))
+            max_w = max(max_w, b[2] - b[0])
+            max_h = max(max_h, b[3] - b[1])
+
+        dw = max_w + stroke_w * 2 + 8
+        dh = max_h + stroke_w * 2 + 8
         strip_w = dw * 10
         strip_h = dh
 
@@ -456,14 +462,14 @@ class ThemeStudioEngine:
 
         for d in range(10):
             txt = str(d)
-            tx = d * dw + (dw - (font.getbbox(txt)[2] - font.getbbox(txt)[0])) // 2
-            ty = (dh - (font.getbbox(txt)[3] - font.getbbox(txt)[1])) // 2
-            # Dibujar contorno
-            if stroke_w > 0:
-                for dx in range(-stroke_w, stroke_w + 1):
-                    for dy in range(-stroke_w, stroke_w + 1):
-                        draw.text((tx + dx, ty + dy), txt, font=font, fill=stroke_hex)
-            draw.text((tx, ty), txt, font=font, fill=color_hex)
+            b = font.getbbox(txt)
+            w = b[2] - b[0]
+            h = b[3] - b[1]
+            # Compensar el desplazamiento top-left natural del glifo de la fuente (b[0] y b[1])
+            tx = d * dw + (dw - w) // 2 - b[0]
+            ty = (dh - h) // 2 - b[1]
+            draw.text((tx, ty), txt, font=font, fill=color_hex,
+                      stroke_width=stroke_w, stroke_fill=stroke_hex if stroke_w > 0 else None)
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")
@@ -473,12 +479,19 @@ class ThemeStudioEngine:
     def render_weekday_strip(font_size: int = 16, color_hex: str = "#FFFFFF",
                              stroke_w: int = 1, stroke_hex: str = "#000000",
                              lang: str = "es", font_family: str = "opensans") -> str:
-        """Genera una tira de 7 días (SUN..SAT o DOM..SAB)."""
+        """Genera una tira de 7 días (SUN..SAT o DOM..SAB) perfectamente centrada sin recortes."""
         days = ["DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"] if lang == "es" else ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
         font = ThemeStudioEngine._get_font(font_family, font_size)
 
-        dw = 58
-        dh = font_size + stroke_w * 2 + 6
+        max_w = 0
+        max_h = 0
+        for txt in days:
+            b = font.getbbox(txt)
+            max_w = max(max_w, b[2] - b[0])
+            max_h = max(max_h, b[3] - b[1])
+
+        dw = max(58, max_w + stroke_w * 2 + 8)
+        dh = max_h + stroke_w * 2 + 8
         strip_w = dw * 7
         strip_h = dh
 
@@ -486,15 +499,13 @@ class ThemeStudioEngine:
         draw = ImageDraw.Draw(img)
 
         for idx, txt in enumerate(days):
-            tb = font.getbbox(txt)
-            tw = tb[2] - tb[0]
-            tx = idx * dw + (dw - tw) // 2
-            ty = 2
-            if stroke_w > 0:
-                for dx in range(-stroke_w, stroke_w + 1):
-                    for dy in range(-stroke_w, stroke_w + 1):
-                        draw.text((tx + dx, ty + dy), txt, font=font, fill=stroke_hex)
-            draw.text((tx, ty), txt, font=font, fill=color_hex)
+            b = font.getbbox(txt)
+            w = b[2] - b[0]
+            h = b[3] - b[1]
+            tx = idx * dw + (dw - w) // 2 - b[0]
+            ty = (dh - h) // 2 - b[1]
+            draw.text((tx, ty), txt, font=font, fill=color_hex,
+                      stroke_width=stroke_w, stroke_fill=stroke_hex if stroke_w > 0 else None)
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")
