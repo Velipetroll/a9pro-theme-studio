@@ -159,25 +159,31 @@ class A9ProDeviceManager:
             if not self.client or not self.connected:
                 break
             try:
-                # Periódicamente (cada 2 seg) enviar consulta de batería y estado
                 now = time.time()
-                if now - last_poll_time >= 2.0:
+                # Sondeo de estado cada 5 seg para no saturar el MCU
+                if now - last_poll_time >= 5.0:
                     last_poll_time = now
-                    # Tag 0x01 = Baterías, Tag 0x0C = ANC, Tag 0x08 = Modo Trabajo
                     query_tags = [1, 2, 8, 12, 13, 14]
                     payload = b"".join(bytes([t, 0]) for t in query_tags)
-                    try:
-                        self.client.write_cmd(self.client.build_cmd(0x27, payload))
-                    except Exception:
-                        pass
+                    with self.lock:
+                        if self.client and self.connected:
+                            try:
+                                self.client.write_cmd(self.client.build_cmd(0x27, payload))
+                            except Exception:
+                                pass
 
-                raw = self.client.recv_notification(timeout=0.3)
+                raw = None
+                with self.lock:
+                    if self.client and self.connected:
+                        raw = self.client.recv_notification(timeout=0.1)
+
                 if raw and len(raw) >= 5:
                     cmd = raw[1]
                     if cmd in (0x27, 0x28):
                         self._parse_device_tlv(raw)
             except Exception:
                 pass
+            time.sleep(0.05)
 
     def _send_query_all_locked(self) -> None:
         if not self.client:

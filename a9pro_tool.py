@@ -708,6 +708,8 @@ class A9ProL2CAPClient:
             if pdu[0] == ATT_OP_MTU_REQ:
                 self.sock.send(struct.pack("<BH", ATT_OP_MTU_RSP, 512))
                 continue
+            if pdu[0] == ATT_OP_HANDLE_NOTIFY:
+                continue
         return False
 
     def recv_notification(self, timeout: float = 3.0) -> Optional[bytes]:
