@@ -1546,10 +1546,10 @@ def get_studio_ui_html() -> str:
               🦸 Personaje PNG (Profundidad)
               <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event, 'overlay')">
             </label>
-            <button onclick="addClockWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
+            <button id="btn-add-clock" onclick="addClockWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
               🕒 Reloj Digital (09:28)
             </button>
-            <button onclick="addDateWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
+            <button id="btn-add-date" onclick="addDateWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
               📅 Fecha & Día (DOM 10/24)
             </button>
             <label class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold cursor-pointer border border-gray-700 transition flex items-center gap-1.5">
@@ -2086,12 +2086,33 @@ def get_studio_ui_html() -> str:
         const x = layer.fit_screen ? 160 : layer.x;
         const y = layer.fit_screen ? 86 : layer.y;
 
-        // Horas y Minutos (type 5 y 6, mode 4) -> 2 dígitos
-        if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
-          const d1 = (layer.type === 5) ? 0 : 2;
-          const d2 = (layer.type === 5) ? 9 : 8;
-          ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
-          ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
+        // Horas, Minutos, Mes, Día y Día de la semana dinámicos en tiempo real
+        const now = new Date();
+        const curH = now.getHours();
+        const curM = now.getMinutes();
+        const curMonth = now.getMonth() + 1; // 1..12
+        const curDay = now.getDate();        // 1..31
+        const curDayOfWeek = now.getDay();   // 0=DOM..6=SAB
+
+        if (layer.mode === 4) {
+          if (layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) {
+            let val = 0;
+            if (layer.type === 5) val = curH;
+            else if (layer.type === 6) val = curM;
+            else if (layer.type === 2) val = curMonth;
+            else if (layer.type === 3) val = curDay;
+
+            const d1 = Math.floor(val / 10) % 10;
+            const d2 = val % 10;
+            ctx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
+            ctx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
+          } else if (layer.type === 4) {
+            // Día de semana (0=DOM, 1=LUN ... 6=SAB)
+            const dIdx = curDayOfWeek % cnt;
+            ctx.drawImage(img, dIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+          } else {
+            ctx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+          }
         } else if (layer.type === 0x13 && cnt > 1) {
           // Animación GIF en bucle
           const fDur = layer.frame_duration_ms || 120;
@@ -2121,6 +2142,13 @@ def get_studio_ui_html() -> str:
         bCtx.fillStyle = "#000000";
         bCtx.fillRect(0, 0, 320, 172);
 
+        const now = new Date();
+        const curH = now.getHours();
+        const curM = now.getMinutes();
+        const curMonth = now.getMonth() + 1;
+        const curDay = now.getDate();
+        const curDayOfWeek = now.getDay();
+
         project.layers.forEach(layer => {
           if (!layer.visible) return;
           const img = layer._imgObj;
@@ -2134,11 +2162,24 @@ def get_studio_ui_html() -> str:
           const x = layer.fit_screen ? 160 : layer.x;
           const y = layer.fit_screen ? 86 : layer.y;
 
-          if ((layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) && layer.mode === 4) {
-            const d1 = (layer.type === 5) ? 0 : 2;
-            const d2 = (layer.type === 5) ? 9 : 8;
-            bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
-            bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
+          if (layer.mode === 4) {
+            if (layer.type === 5 || layer.type === 6 || layer.type === 2 || layer.type === 3) {
+              let val = 0;
+              if (layer.type === 5) val = curH;
+              else if (layer.type === 6) val = curM;
+              else if (layer.type === 2) val = curMonth;
+              else if (layer.type === 3) val = curDay;
+
+              const d1 = Math.floor(val / 10) % 10;
+              const d2 = val % 10;
+              bCtx.drawImage(img, d1 * fw, 0, fw, fh, Math.floor(x - dw), Math.floor(y - dh / 2), dw, dh);
+              bCtx.drawImage(img, d2 * fw, 0, fw, fh, Math.floor(x), Math.floor(y - dh / 2), dw, dh);
+            } else if (layer.type === 4) {
+              const dIdx = curDayOfWeek % cnt;
+              bCtx.drawImage(img, dIdx * fw, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+            } else {
+              bCtx.drawImage(img, 0, 0, fw, fh, Math.floor(x - dw / 2), Math.floor(y - dh / 2), dw, dh);
+            }
           } else if (layer.type === 0x13 && cnt > 1) {
             const fDur = layer.frame_duration_ms || 120;
             const nowMs = Date.now();
@@ -2151,6 +2192,23 @@ def get_studio_ui_html() -> str:
       }
     }
 
+    // Actualizar botones de añadir reloj y fecha en tiempo real (reloj en vivo)
+    function updateWidgetButtonsClock() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const days = ["DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"];
+      const dayName = days[now.getDay()];
+
+      const bClock = document.getElementById('btn-add-clock');
+      if (bClock) bClock.innerHTML = `🕒 Reloj Digital (${hh}:${mm})`;
+
+      const bDate = document.getElementById('btn-add-date');
+      if (bDate) bDate.innerHTML = `📅 Fecha & Día (${dayName} ${month}/${day})`;
+    }
+
     // Bucle de renderizado para animaciones en vivo sincronizado a 30 FPS
     setInterval(() => {
       const hasAnim = project.layers.some(l => l.type === 0x13 && l.count > 1);
@@ -2158,6 +2216,16 @@ def get_studio_ui_html() -> str:
         drawCanvas();
       }
     }, 33);
+
+    // Bucle para actualizar reloj y fecha cada segundo
+    setInterval(() => {
+      updateWidgetButtonsClock();
+      const hasClockOrDate = project.layers.some(l => l.mode === 4 || [1, 2, 3, 4, 5, 6, 7].includes(l.type));
+      if (hasClockOrDate) {
+        drawCanvas();
+      }
+    }, 1000);
+    updateWidgetButtonsClock();
 
     function imWidth(l) { return l._imgObj ? l._imgObj.width : (l.width || 320); }
     function imHeight(l) { return l._imgObj ? l._imgObj.height : (l.height || 172); }
