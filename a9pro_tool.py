@@ -687,6 +687,29 @@ class A9ProL2CAPClient:
         att_pdu = struct.pack("<BH", ATT_OP_WRITE_CMD, handle) + payload
         self.sock.send(att_pdu)
 
+    def write_req(self, payload: bytes, handle: int = HANDLE_TX, timeout: float = 2.0) -> bool:
+        assert self.sock is not None
+        att_pdu = struct.pack("<BH", ATT_OP_WRITE_REQ, handle) + payload
+        self.sock.send(att_pdu)
+        deadline = time.time() + timeout
+        self.sock.settimeout(timeout)
+        while time.time() < deadline:
+            try:
+                pdu = self.sock.recv(512)
+            except (socket.timeout, OSError):
+                return False
+            if not pdu:
+                return False
+            if pdu[0] == ATT_OP_WRITE_RSP:
+                return True
+            if pdu[0] == 0x01:  # ATT_OP_ERROR_RSP
+                print(f"[BLE] Error en write_req: {pdu.hex()}")
+                return False
+            if pdu[0] == ATT_OP_MTU_REQ:
+                self.sock.send(struct.pack("<BH", ATT_OP_MTU_RSP, 512))
+                continue
+        return False
+
     def recv_notification(self, timeout: float = 3.0) -> Optional[bytes]:
         assert self.sock is not None
         self.sock.settimeout(timeout)
@@ -749,24 +772,18 @@ class A9ProL2CAPClient:
         finally:
             self.close()
 
-    def sync_time(self) -> None:
+    def sync_time(self, offset_hours: float = -10.0) -> bool:
         self.connect()
         try:
-            now = time.localtime()
-            payload = bytes([
-                now.tm_year % 100,
-                now.tm_mon,
-                now.tm_mday,
-                now.tm_hour,
-                now.tm_min,
-                now.tm_sec,
-            ])
-            self.write_cmd(self.build_cmd(CMD_TIMESTAMP, payload))
+            target_ts = int(time.time() + (offset_hours * 3600))
+            payload = struct.pack("<I", target_ts)
+            cmd_pkt = self.build_cmd(CMD_TIMESTAMP, payload)
+            ok = self.write_req(cmd_pkt)
+            local_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             print(
-                f"[BLE] Hora sincronizada a: {now.tm_year:04d}-{now.tm_mon:02d}-{now.tm_mday:02d} "
-                f"{now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}"
+                f"[BLE] Hora sincronizada a: {local_str} (Unix ts: {target_ts}, offset: {offset_hours:+.1f}h, res: {'OK' if ok else 'FALLIDO'})"
             )
-            time.sleep(0.2)
+            return ok
         finally:
             self.close()
 
