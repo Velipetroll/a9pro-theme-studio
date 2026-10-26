@@ -285,15 +285,11 @@ class A9ProDeviceManager:
         return self.send_raw_command(0x37, bytes([mask]))
 
     def sync_time(self) -> bool:
-        now = time.localtime()
-        payload = bytes([
-            now.tm_year % 100,
-            now.tm_mon,
-            now.tm_mday,
-            now.tm_hour,
-            now.tm_min,
-            now.tm_sec,
-        ])
+        now_ts = int(time.time())
+        # Formato oficial JL / A9 Pro (setTimestamp en la app oficial):
+        # 4 bytes de Unix timestamp en segundos (Little Endian uint32)
+        payload = struct.pack("<I", now_ts)
+        print(f"[DeviceManager] Sincronizando hora con Unix timestamp: {now_ts} (bytes: {list(payload)})")
         return self.send_raw_command(0x93, payload)
 
     def upload_theme_async(self, bin_data: bytes) -> None:
