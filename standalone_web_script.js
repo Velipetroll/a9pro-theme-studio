@@ -246,6 +246,68 @@ function parseIncomingNotification(event) {
 
 function bool(x) { return !!x; }
 
+function showBleHelpModal() {
+  let m = document.getElementById('modal-ble-help');
+  if (m) {
+    m.classList.remove('hidden');
+    return;
+  }
+  m = document.createElement('div');
+  m.id = 'modal-ble-help';
+  m.className = 'fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+  m.innerHTML = `
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl text-left">
+      <div class="flex items-center justify-between pb-2 border-b border-gray-800">
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">📡</span>
+          <h3 class="text-base font-bold text-white">Navegador sin soporte de Web Bluetooth</h3>
+        </div>
+        <button onclick="document.getElementById('modal-ble-help').classList.add('hidden')" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+      
+      <p class="text-xs text-gray-300 leading-relaxed">
+        Estás usando un navegador (como <b class="text-amber-400">Mozilla Firefox</b> o Safari) que no implementa la tecnología <b>Web Bluetooth API</b> por políticas de su motor web.
+      </p>
+
+      <div class="bg-gray-800/80 rounded-xl p-4 border border-gray-700/60 space-y-3 text-xs">
+        <p class="font-bold text-blue-400 text-sm">¿Cómo conectar la caja A9 Pro?</p>
+        
+        <div class="space-y-1">
+          <p class="font-semibold text-white">1. Si estás en esta computadora (Linux):</p>
+          <p class="text-gray-300 text-[11px]">Tienes el servidor local ya ejecutándose en segundo plano. Ábrelo en Firefox o en cualquier navegador:</p>
+          <a href="http://localhost:8765" target="_blank" class="inline-block mt-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 px-3 py-1.5 rounded-lg font-mono text-xs border border-blue-500/40">
+            👉 Abrir http://localhost:8765
+          </a>
+          <p class="text-gray-400 text-[10px] mt-0.5">(En el servidor local, Python maneja el Bluetooth directamente por BlueZ sin depender del navegador).</p>
+        </div>
+
+        <div class="space-y-1 pt-2 border-t border-gray-700/40">
+          <p class="font-semibold text-white">2. Para usar Web Bluetooth directo desde GitHub Pages:</p>
+          <p class="text-gray-300 text-[11px]">Abre esta página en <b class="text-white">Google Chrome</b> (ya está instalado en tu sistema):</p>
+          <pre class="bg-black/60 p-2 rounded mt-1 font-mono text-[10px] text-green-400 select-all overflow-x-auto">google-chrome-stable https://velipetroll.github.io/a9pro-theme-studio/</pre>
+          <p class="text-gray-400 text-[10px]">En Linux, recuerda habilitar la bandera experimental: <code class="text-amber-300">chrome://flags/#enable-experimental-web-platform-features</code> y reiniciar Chrome.</p>
+        </div>
+
+        <div class="space-y-1 pt-2 border-t border-gray-700/40">
+          <p class="font-semibold text-white">3. Desde tu teléfono celular:</p>
+          <p class="text-gray-300 text-[11px]">Abre la página en <b class="text-white">Google Chrome para Android</b> con Bluetooth activado.</p>
+        </div>
+      </div>
+
+      <div class="bg-emerald-950/40 border border-emerald-800/50 rounded-xl p-3 text-[11px] text-emerald-300">
+        💡 <b>Recuerda:</b> En este navegador puedes seguir diseñando esferas completas, subiendo GIFs, personalizando fuentes tipográficas y pulsando <b>"Descargar Archivo .bin"</b> sin ninguna limitación.
+      </div>
+
+      <div class="flex justify-end">
+        <button onclick="document.getElementById('modal-ble-help').classList.add('hidden')" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white rounded-lg transition shadow">
+          Entendido
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(m);
+}
+
 async function toggleConnect() {
   if (deviceState.connected) {
     if (bleDevice && bleDevice.gatt.connected) {
@@ -256,7 +318,7 @@ async function toggleConnect() {
     showToast("Bluetooth", "Desconectado de la caja", "🔌", false);
   } else {
     if (!navigator.bluetooth) {
-      // Fallback a servidor local si no hay Web Bluetooth en navegador
+      // Intentar fallback al servidor local si estamos en localhost
       try {
         const res = await fetch('/api/connect');
         const data = await res.json();
@@ -267,7 +329,7 @@ async function toggleConnect() {
           return;
         }
       } catch (e) {}
-      alert("Tu navegador no soporta Web Bluetooth. Usa Google Chrome, Opera, Brave o Edge en HTTPS.");
+      showBleHelpModal();
       return;
     }
 
@@ -351,7 +413,11 @@ async function syncTime() {
   if (ok) {
     showToast("Reloj Sincronizado", `Hora local enviada (ajuste: ${offset}h). Si la pantalla no cambia al instante, apágala y préndela para refrescar dígitos. 🕒`, "🕒", true);
   } else {
-    alert("No se pudo sincronizar el reloj. Asegúrate de conectar el Bluetooth y encender la pantalla de la caja.");
+    if (!navigator.bluetooth && !deviceState.connected) {
+      showBleHelpModal();
+    } else {
+      alert("No se pudo sincronizar el reloj. Asegúrate de conectar el Bluetooth y encender la pantalla de la caja.");
+    }
   }
 }
 
@@ -1377,6 +1443,10 @@ async function uploadBinDataDirect(binData) {
         return;
       }
     } catch (e) {}
+    if (!navigator.bluetooth) {
+      showBleHelpModal();
+      return;
+    }
     alert("Primero conecta la caja con el botón 'Conectar Caja' vía Bluetooth.");
     return;
   }
