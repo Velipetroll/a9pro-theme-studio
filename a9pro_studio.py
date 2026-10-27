@@ -620,9 +620,8 @@ class ThemeStudioEngine:
         frames = []
         for frame in raw_frames:
             if fit_screen:
-                # Ajuste proporcional exacto a pantalla completa (320x172) sin aplastar ni deformar (crop centrado con NEAREST)
-                from PIL import ImageOps
-                frame = ImageOps.fit(frame, (320, 172), method=Image.Resampling.NEAREST, centering=(0.5, 0.5))
+                # Ajuste a pantalla completa (320x172) sin recortar contenido
+                frame = frame.resize((320, 172), Image.Resampling.NEAREST)
             elif target_w and target_h:
                 if target_w > 320:
                     target_h = max(1, int(round(target_h * 320.0 / target_w)))
@@ -674,8 +673,7 @@ class ThemeStudioEngine:
                 target_h = max(1, int(round(target_h * 320.0 / target_w)))
                 target_w = 320
             if mode == "cover":
-                from PIL import ImageOps
-                im = ImageOps.fit(im, (target_w, target_h), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+                im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
             elif mode == "fit_exact":
                 im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
             elif mode == "contain":
@@ -812,23 +810,11 @@ class ThemeStudioEngine:
                     l_copy["target_w"] = new_fw
                     l_copy["target_h"] = new_fh
 
-                crop_res = ThemeStudioEngine.crop_layer_to_viewport(
-                    im,
-                    int(l_copy.get("x", 160)),
-                    int(l_copy.get("y", 86)),
-                    cnt=cnt,
-                    target_w=l_copy.get("target_w"),
-                    target_h=l_copy.get("target_h")
-                )
-                if crop_res is None:
-                    # Capa 100% fuera de pantalla: omitir
-                    continue
-                crop_im, nx, ny = crop_res
                 buf = io.BytesIO()
-                crop_im.save(buf, format="PNG")
+                im.save(buf, format="PNG")
                 l_copy["image_data"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
-                l_copy["x"] = nx
-                l_copy["y"] = ny
+                l_copy["x"] = int(round(float(l.get("x", 160))))
+                l_copy["y"] = int(round(float(l.get("y", 86))))
                 cropped_active_layers.append(l_copy)
             except Exception:
                 cropped_active_layers.append(l)
@@ -917,7 +903,9 @@ class ThemeStudioEngine:
         descs = bytearray()
         for l, off in zip(active_layers, layer_offsets):
             d = bytearray(20)
-            struct.pack_into("<IBBBBHH", d, 0, off, int(l.get("mode", 2)), int(l.get("type", 0x10)), int(l.get("count", 1)), 1, int(l.get("x", 160)), int(l.get("y", 86)))
+            lx = max(0, min(65535, int(round(float(l.get("x", 160))))))
+            ly = max(0, min(65535, int(round(float(l.get("y", 86))))))
+            struct.pack_into("<IBBBBHH", d, 0, off, int(l.get("mode", 2)), int(l.get("type", 0x10)), int(l.get("count", 1)), 1, lx, ly)
             raw_extra = l.get("extra") or []
             clean_extra = [int(b) if isinstance(b, (int, float)) and not math.isnan(b) else 0 for b in raw_extra]
             clean_extra = (clean_extra + [0] * 8)[:8]
@@ -2724,6 +2712,11 @@ def get_studio_ui_html() -> str:
 
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (l) {
+        if (l.fit_screen) {
+          l.fit_screen = false;
+          const fsTxt = document.getElementById('txt-fullscreen-status');
+          if (fsTxt) { fsTxt.innerText = 'OFF'; fsTxt.className = 'font-bold text-gray-400'; }
+        }
         l.x = Math.round(initialLayerX + (mx - dragStartX));
         l.y = Math.round(initialLayerY + (my - dragStartY));
         document.getElementById('inp-x').value = l.x;
@@ -2757,14 +2750,15 @@ def get_studio_ui_html() -> str:
           const im = new Image();
           im.onload = () => {
             if (kind === 'background') {
-              // Fondo reemplaza o agrega al inicio
+              // Fondo reemplaza o agrega al inicio (ajustado a pantalla completa 320x172)
               const l = {
                 id: 'layer_bg_' + Date.now(),
                 name: 'Fondo Pantalla (320×172)',
                 type: 0x10, mode: 2, count: 1, fmt: 1,
                 x: 160, y: 86, has_alpha: false,
+                fit_screen: true,
                 width: im.width, height: im.height,
-                target_w: im.width, target_h: im.height,
+                target_w: 320, target_h: 172,
                 image_data: finalB64, _rawImgB64: finalB64,
                 res_pct: 100, max_colors: 256,
                 extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
@@ -2772,12 +2766,13 @@ def get_studio_ui_html() -> str:
               project.layers.unshift(l);
               selectLayer(l.id);
             } else {
-              // Personaje superpuesto (Efecto profundidad)
+              // Personaje superpuesto (Efecto profundidad, conserva sus dimensiones y posición exacta)
               const l = {
                 id: 'layer_overlay_' + Date.now(),
                 name: 'Personaje PNG (Profundidad)',
                 type: 0x10, mode: 2, count: 1, fmt: 1,
                 x: 160, y: 86, has_alpha: true,
+                fit_screen: false,
                 width: im.width, height: im.height,
                 target_w: im.width, target_h: im.height,
                 image_data: finalB64, _rawImgB64: finalB64,
