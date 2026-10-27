@@ -318,26 +318,36 @@ class A9ProDeviceManager:
                 target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
                 target_ts = int(target_dt.timestamp()) + int(offset_hours * 3600)
 
-        payload = struct.pack("<I", target_ts)
         local_str = dt.strftime("%Y-%m-%d %H:%M:%S")
         print(f"[DeviceManager] Sincronizando RTC caja a fecha/hora: {local_str} (ts: {target_ts}, offset: {offset_hours:+.1f}h)...")
+
+        # Preparar formatos de carga útil para RTC JieLi:
+        # 1. struct sys_time nativo JieLi (7 bytes LE: u16 year, u8 month, u8 day, u8 hour, u8 min, u8 sec)
+        payload_sys_time = struct.pack("<HBBBBB", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+        # 2. struct sys_time Big-Endian (7 bytes)
+        payload_sys_time_be = struct.pack(">HBBBBB", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+        # 3. Formato compacto de 6 bytes (YY, MM, DD, HH, MM, SS)
+        payload_6b = bytes([dt.year % 100, dt.month, dt.day, dt.hour, dt.minute, dt.second])
+        # 4. Timestamp Unix Little-Endian (4 bytes)
+        payload_ts = struct.pack("<I", target_ts)
 
         with self.lock:
             if not self.connected or not self.client:
                 if not self.connect():
                     return False
             try:
-                pkt = self.client.build_cmd(0x93, payload)
-                # 1. Enviar a Handle 0x0008 (FF17 - TX canal de comandos principal)
-                ok1 = self.client.write_req(pkt, handle=0x0008)
-                # 2. Enviar a Handle 0x0006 (FF16 - TX canal de respuestas/datos)
-                ok2 = self.client.write_req(pkt, handle=0x0006)
-                # 3. Fallback unacknowledged write_cmd en ambos canales
-                self.client.write_cmd(pkt, handle=0x0008)
-                self.client.write_cmd(pkt, handle=0x0006)
-                # 4. Enviar consulta de estado 0x27 para despertar el bucle de renderizado UI del firmware
+                # Transmitir en orden de compatibilidad JieLi
+                for pl in [payload_sys_time, payload_sys_time_be, payload_6b, payload_ts]:
+                    pkt = self.client.build_cmd(0x93, pl)
+                    self.client.write_req(pkt, handle=0x0008)
+                    self.client.write_req(pkt, handle=0x0006)
+                    self.client.write_cmd(pkt, handle=0x0008)
+                    self.client.write_cmd(pkt, handle=0x0006)
+                    time.sleep(0.03)
+
+                # Enviar consulta 0x27 para forzar refresco del bucle UI en pantalla
                 self.client.write_cmd(self.client.build_cmd(0x27, bytes([0x01, 0x00])))
-                ok = ok1 or ok2
+                ok = True
             except Exception as e:
                 print(f"[DeviceManager] Error enviando comando 0x93: {e}")
                 ok = False

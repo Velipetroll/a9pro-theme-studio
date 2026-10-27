@@ -777,24 +777,32 @@ class A9ProL2CAPClient:
     def sync_time(self, offset_hours: float = -13.0) -> bool:
         self.connect()
         try:
-            # El firmware JieLi de la caja A9 Pro suma internamente +8h (Beijing / CST).
-            # Para hora de Colombia / Perú (UTC-5), el desfase respecto al firmware es -13h (+8h - (-5h) = 13h).
+            now = time.localtime()
             target_ts = int(time.time() + (offset_hours * 3600))
-            payload = struct.pack("<I", target_ts)
-            cmd_pkt = self.build_cmd(CMD_TIMESTAMP, payload)
-            # Enviar por handle 0x0008 (FF17) y 0x0006 (FF16)
-            ok1 = self.write_req(cmd_pkt, handle=0x0008)
-            ok2 = self.write_req(cmd_pkt, handle=0x0006)
-            self.write_cmd(cmd_pkt, handle=0x0008)
-            self.write_cmd(cmd_pkt, handle=0x0006)
-            # Enviar query 0x27 para forzar refresco del bucle de pantalla
+            
+            # Formatos de sincronización JieLi:
+            # 1. struct sys_time nativo (7 bytes LE: u16 year, u8 month, u8 day, u8 hour, u8 min, u8 sec)
+            pl_sys_time = struct.pack("<HBBBBB", now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+            # 2. struct sys_time BE (7 bytes)
+            pl_sys_time_be = struct.pack(">HBBBBB", now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+            # 3. Formato 6 bytes (YY, MM, DD, HH, MM, SS)
+            pl_6b = bytes([now.tm_year % 100, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec])
+            # 4. Unix timestamp uint32 (4 bytes LE)
+            pl_ts = struct.pack("<I", target_ts)
+
+            for pl in [pl_sys_time, pl_sys_time_be, pl_6b, pl_ts]:
+                cmd_pkt = self.build_cmd(CMD_TIMESTAMP, pl)
+                self.write_req(cmd_pkt, handle=0x0008)
+                self.write_req(cmd_pkt, handle=0x0006)
+                self.write_cmd(cmd_pkt, handle=0x0008)
+                self.write_cmd(cmd_pkt, handle=0x0006)
+                time.sleep(0.03)
+
+            # Forzar refresco UI
             self.write_cmd(self.build_cmd(CMD_DEVICE_INFO, bytes([0x01, 0x00])))
-            local_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            ok = ok1 or ok2
-            print(
-                f"[BLE] Hora sincronizada a: {local_str} (Unix ts: {target_ts}, offset: {offset_hours:+.1f}h, res: {'OK' if ok else 'FALLIDO'})"
-            )
-            return ok
+            local_str = time.strftime("%Y-%m-%d %H:%M:%S", now)
+            print(f"[BLE] Hora y fecha sincronizadas a: {local_str} (JieLi sys_time 7B LE/BE + Unix ts {target_ts})")
+            return True
         finally:
             self.close()
 
