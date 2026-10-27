@@ -295,65 +295,7 @@ class A9ProDeviceManager:
         mask = (1 if left else 0) | (2 if right else 0)
         return self.send_raw_command(0x37, bytes([mask]))
 
-    def sync_time(self, offset_hours: float = -13.0, exact_datetime: Optional[datetime.datetime] = None) -> bool:
-        if exact_datetime:
-            dt = exact_datetime
-            if offset_hours == 0.0:
-                # Enviar timestamp directo sin restar 8 horas
-                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
-                target_ts = int(target_dt.timestamp())
-            else:
-                # Compensar los +8h de Beijing que suma el chip internamente
-                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
-                target_ts = int(target_dt.timestamp()) - 8 * 3600
-        else:
-            dt = datetime.datetime.now()
-            if offset_hours == 0.0:
-                target_ts = int(time.time())
-            elif offset_hours == -13.0:
-                # Colombia (UTC-5) -> Compensación Beijing (+8h): local_time - 8h
-                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
-                target_ts = int(target_dt.timestamp()) - 8 * 3600
-            else:
-                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
-                target_ts = int(target_dt.timestamp()) + int(offset_hours * 3600)
 
-        local_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[DeviceManager] Sincronizando RTC caja a fecha/hora: {local_str} (ts: {target_ts}, offset: {offset_hours:+.1f}h)...")
-
-        # Preparar formatos de carga útil para RTC JieLi:
-        # 1. struct sys_time nativo JieLi (7 bytes LE: u16 year, u8 month, u8 day, u8 hour, u8 min, u8 sec)
-        payload_sys_time = struct.pack("<HBBBBB", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
-        # 2. struct sys_time Big-Endian (7 bytes)
-        payload_sys_time_be = struct.pack(">HBBBBB", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
-        # 3. Formato compacto de 6 bytes (YY, MM, DD, HH, MM, SS)
-        payload_6b = bytes([dt.year % 100, dt.month, dt.day, dt.hour, dt.minute, dt.second])
-        # 4. Timestamp Unix Little-Endian (4 bytes)
-        payload_ts = struct.pack("<I", target_ts)
-
-        with self.lock:
-            if not self.connected or not self.client:
-                if not self.connect():
-                    return False
-            try:
-                # Transmitir en orden de compatibilidad JieLi
-                for pl in [payload_sys_time, payload_sys_time_be, payload_6b, payload_ts]:
-                    pkt = self.client.build_cmd(0x93, pl)
-                    self.client.write_req(pkt, handle=0x0008)
-                    self.client.write_req(pkt, handle=0x0006)
-                    self.client.write_cmd(pkt, handle=0x0008)
-                    self.client.write_cmd(pkt, handle=0x0006)
-                    time.sleep(0.03)
-
-                # Enviar consulta 0x27 para forzar refresco del bucle UI en pantalla
-                self.client.write_cmd(self.client.build_cmd(0x27, bytes([0x01, 0x00])))
-                ok = True
-            except Exception as e:
-                print(f"[DeviceManager] Error enviando comando 0x93: {e}")
-                ok = False
-
-        print(f"[DeviceManager] Sincronización de hora: {'EXITOSA' if ok else 'FALLIDA'}")
-        return ok
 
     def upload_theme_async(self, bin_data: bytes) -> None:
         """Inicia la subida del archivo .bin en segundo plano con reporte de progreso."""
@@ -392,11 +334,9 @@ class A9ProDeviceManager:
                 self.upload_state["error"] = str(e)
             finally:
                 self.upload_state["active"] = False
-                # Reconectar cliente regular y sincronizar reloj automáticamente
-                time.sleep(2.0)
+                time.sleep(1.0)
                 try:
-                    if self.connect():
-                        self.sync_time()
+                    self.connect()
                 except Exception:
                     pass
 
@@ -1098,19 +1038,7 @@ class StudioHTTPHandler(BaseHTTPRequestHandler):
             right = req.get("right", False)
             ok = device_mgr.find_earbuds(left, right)
             self._send_json({"success": ok})
-        elif path == "/api/control/sync_time":
-            manual_date = req.get("manual_date")
-            manual_time = req.get("manual_time")
-            exact_dt = None
-            if manual_date and manual_time:
-                try:
-                    exact_dt = datetime.datetime.strptime(f"{manual_date} {manual_time}", "%Y-%m-%d %H:%M")
-                except Exception:
-                    pass
-            offset_hours = float(req.get("offset_hours", -13.0))
-            ok = device_mgr.sync_time(offset_hours=offset_hours, exact_datetime=exact_dt)
-            curr_str = (exact_dt or datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-            self._send_json({"success": ok, "offset_hours": offset_hours, "synced_time": curr_str})
+
         elif path == "/api/themes/render_strip":
             strip_type = req.get("strip_type", "digits")
             font_size = req.get("font_size", 50)
@@ -1407,10 +1335,7 @@ def get_studio_ui_html() -> str:
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <button onclick="requestBattery()" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg shadow transition flex items-center gap-1.5">
-              🔄 Consultar Batería
-            </button>
-            <button onclick="syncTimeAuto()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5">
-              🕒 Sincronizar Hora con mi PC (Auto)
+              🔄 Consultar Batería / Estado
             </button>
           </div>
           <div class="flex items-center space-x-2 text-xs text-gray-400">
@@ -1421,26 +1346,6 @@ def get_studio_ui_html() -> str:
             <span>Límite: <b class="text-gray-200">150 KB</b></span>
           </div>
         </div>
-
-        <!-- Ajuste Manual de Fecha y Hora -->
-        <div class="pt-2 border-t border-gray-800 flex flex-wrap items-center gap-3 text-xs">
-          <span class="text-gray-400 font-medium flex items-center gap-1">⏱️ Ajuste Manual:</span>
-          <input type="date" id="inp-sync-date" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1 text-xs focus:outline-none">
-          <input type="time" id="inp-sync-time" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1 text-xs focus:outline-none">
-          <select id="sel-time-offset" class="bg-gray-800 border border-gray-700 text-amber-400 font-semibold px-2 py-1 rounded text-xs focus:outline-none">
-            <option value="-13" selected>Offset -13h (Colombia / UTC-5)</option>
-            <option value="-14">Offset -14h (UTC-6)</option>
-            <option value="-12">Offset -12h (UTC-4)</option>
-            <option value="0">Offset 0h (UTC Puro)</option>
-          </select>
-          <button onclick="syncTimeManual()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-semibold rounded text-xs shadow transition">
-            Enviar Fecha y Hora Elegida
-          </button>
-        </div>
-
-        <p class="text-[11px] text-gray-400 flex items-center gap-1">
-          💡 <span><b>Tip:</b> Tras enviar la hora, si la pantalla de la caja no cambia al segundo: apaga y enciende la pantalla con el botón lateral o desliza entre pantallas para que se refresquen los dígitos.</span>
-        </p>
       </div>
 
       <!-- Fila de Controles Oficiales (ANC, Modos, Ecualizador) -->
@@ -2110,61 +2015,6 @@ def get_studio_ui_html() -> str:
       updateStatus();
     }
 
-    async function syncTimeAuto() {
-      try {
-        const res = await fetch('/api/control/sync_time', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ offset_hours: -13.0 })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast("Reloj Sincronizado", `Hora local de tu PC enviada: ${data.synced_time}. Apaga y enciende la pantalla de la caja para refrescar. 🕒`, "🕒", true);
-        } else {
-          alert("No se pudo sincronizar el reloj. Enciende la pantalla de la caja para que el Bluetooth responda.");
-        }
-      } catch (e) {
-        alert("Error de conexión al sincronizar: " + e.message);
-      }
-    }
-
-    async function syncTimeManual() {
-      const inpDate = document.getElementById('inp-sync-date');
-      const inpTime = document.getElementById('inp-sync-time');
-      const sel = document.getElementById('sel-time-offset');
-      const offset = sel ? parseFloat(sel.value) : -13.0;
-
-      let dateVal = inpDate ? inpDate.value : '';
-      let timeVal = inpTime ? inpTime.value : '';
-
-      if (!dateVal || !timeVal) {
-        const now = new Date();
-        if (!dateVal) dateVal = now.toISOString().split('T')[0];
-        if (!timeVal) timeVal = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-      }
-
-      try {
-        const res = await fetch('/api/control/sync_time', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            manual_date: dateVal,
-            manual_time: timeVal,
-            offset_hours: offset
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast("Fecha y Hora Enviada", `Hora fijada a: ${data.synced_time}. Apaga y enciende la pantalla de la caja para ver los nuevos dígitos. 🕒`, "🕒", true);
-        } else {
-          alert("No se pudo sincronizar el reloj. Enciende la pantalla de la caja para que el Bluetooth responda.");
-        }
-      } catch (e) {
-        alert("Error al sincronizar: " + e.message);
-      }
-    }
-
-    const syncTime = syncTimeAuto;
 
     async function setNoiseMode(m) {
       await fetch('/api/control/noise', { method: 'POST', body: JSON.stringify({ mode: m }) });
@@ -3525,14 +3375,6 @@ def get_studio_ui_html() -> str:
       loadOfficialToStudio('385_deb0daf817f94b5d8e1fb4a0ff4bd7f3', false);
     }
 
-    function initSyncInputs() {
-      const inpDate = document.getElementById('inp-sync-date');
-      const inpTime = document.getElementById('inp-sync-time');
-      const now = new Date();
-      if (inpDate) inpDate.value = now.toISOString().split('T')[0];
-      if (inpTime) inpTime.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-    }
-    initSyncInputs();
 
     setTimeout(initThemeOnStartup, 150);
 

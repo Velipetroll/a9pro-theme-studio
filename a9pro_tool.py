@@ -774,37 +774,7 @@ class A9ProL2CAPClient:
         finally:
             self.close()
 
-    def sync_time(self, offset_hours: float = -13.0) -> bool:
-        self.connect()
-        try:
-            now = time.localtime()
-            target_ts = int(time.time() + (offset_hours * 3600))
-            
-            # Formatos de sincronización JieLi:
-            # 1. struct sys_time nativo (7 bytes LE: u16 year, u8 month, u8 day, u8 hour, u8 min, u8 sec)
-            pl_sys_time = struct.pack("<HBBBBB", now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-            # 2. struct sys_time BE (7 bytes)
-            pl_sys_time_be = struct.pack(">HBBBBB", now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-            # 3. Formato 6 bytes (YY, MM, DD, HH, MM, SS)
-            pl_6b = bytes([now.tm_year % 100, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec])
-            # 4. Unix timestamp uint32 (4 bytes LE)
-            pl_ts = struct.pack("<I", target_ts)
 
-            for pl in [pl_sys_time, pl_sys_time_be, pl_6b, pl_ts]:
-                cmd_pkt = self.build_cmd(CMD_TIMESTAMP, pl)
-                self.write_req(cmd_pkt, handle=0x0008)
-                self.write_req(cmd_pkt, handle=0x0006)
-                self.write_cmd(cmd_pkt, handle=0x0008)
-                self.write_cmd(cmd_pkt, handle=0x0006)
-                time.sleep(0.03)
-
-            # Forzar refresco UI
-            self.write_cmd(self.build_cmd(CMD_DEVICE_INFO, bytes([0x01, 0x00])))
-            local_str = time.strftime("%Y-%m-%d %H:%M:%S", now)
-            print(f"[BLE] Hora y fecha sincronizadas a: {local_str} (JieLi sys_time 7B LE/BE + Unix ts {target_ts})")
-            return True
-        finally:
-            self.close()
 
     def upload_watchface(
         self,
@@ -970,16 +940,6 @@ def main():
     p_info.add_argument("--mac", default=DEFAULT_MAC, help=f"Dirección MAC (por defecto {DEFAULT_MAC})")
     p_info.add_argument("--scan", action="store_true", help="Escanear antes de conectar")
 
-    # Subcomando: time
-    p_time = sub.add_parser("time", help="Sincroniza la fecha y hora de tu PC con la caja A9 Pro Box")
-    p_time.add_argument("--mac", default=DEFAULT_MAC, help=f"Dirección MAC (por defecto {DEFAULT_MAC})")
-    p_time.add_argument(
-        "--offset",
-        type=float,
-        default=-13.0,
-        help="Desfase horario en horas (por defecto -13.0 para Colombia/UTC-5 respecto a Beijing UTC+8)",
-    )
-
     # Subcomando: build
     p_build = sub.add_parser("build", help="Construye un archivo de tema .bin personalizado sin límites de la app")
     p_build.add_argument("--bg", required=True, type=Path, help="Imagen de fondo (PNG/JPG)")
@@ -1023,9 +983,6 @@ def main():
         mac = asyncio.run(scan_for_mac()) if args.scan else args.mac
         client = A9ProL2CAPClient(address=mac or DEFAULT_MAC)
         client.query_info()
-    elif args.cmd == "time":
-        client = A9ProL2CAPClient(address=args.mac)
-        client.sync_time(offset_hours=args.offset)
     elif args.cmd == "build":
         bin_bytes = build_custom_dial_bin(
             bg_path=args.bg,
