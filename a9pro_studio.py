@@ -1702,12 +1702,6 @@ def get_studio_ui_html() -> str:
                 <span id="txt-fullscreen-status" class="font-bold text-gray-400">OFF</span>
               </button>
 
-              <!-- Conmutador de Transparencia (Fondo transparente / Alpha) -->
-              <button id="btn-toggle-alpha" onclick="toggleLayerAlpha()" class="w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition" title="Activa o desactiva la transparencia (canal Alpha) para evitar fondos negros">
-                <span>✨ Fondo Transparente:</span>
-                <span id="txt-alpha-status" class="font-bold text-gray-400">OFF</span>
-              </button>
-
               <!-- Reductor de Resolución (Slider interactivo: reduce peso en KB manteniendo escala en pantalla) -->
               <div class="space-y-1">
                 <div class="flex justify-between items-center text-[11px]">
@@ -2111,9 +2105,8 @@ def get_studio_ui_html() -> str:
 
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
-        const fh = imHeight(layer);
-        const dw = layer.fit_screen ? 320 : fw;
-        const dh = layer.fit_screen ? 172 : fh;
+        const dw = layer.fit_screen ? 320 : (layer.target_w || layer.orig_w || fw);
+        const dh = layer.fit_screen ? 172 : (layer.target_h || layer.orig_h || fh);
         const x = layer.fit_screen ? 160 : layer.x;
         const y = layer.fit_screen ? 86 : layer.y;
 
@@ -2274,6 +2267,10 @@ def get_studio_ui_html() -> str:
           l._imgObj = im;
         }
         if (l.raw_gif_b64 && !l._rawGifB64) l._rawGifB64 = l.raw_gif_b64;
+        if (!l.raw_image_b64 && l.image_data) l.raw_image_b64 = l.image_data;
+        if (!l._rawImgB64 && l.raw_image_b64) l._rawImgB64 = l.raw_image_b64;
+        if (!l.orig_w && l.width) l.orig_w = l.width;
+        if (!l.orig_h && l.height) l.orig_h = l.height;
         if (l.orig_frames_count && !l._origFramesCount) l._origFramesCount = l.orig_frames_count;
         if (l.orig_video_w && !l._origVideoW) l._origVideoW = l.orig_video_w;
         if (l.orig_video_h && !l._origVideoH) l._origVideoH = l.orig_video_h;
@@ -2412,21 +2409,6 @@ def get_studio_ui_html() -> str:
         }
       }
 
-      // Indicador y botón de Transparencia (Alpha)
-      const alphaBtn = document.getElementById('btn-toggle-alpha');
-      const alphaTxt = document.getElementById('txt-alpha-status');
-      if (alphaBtn && alphaTxt) {
-        if (l.has_alpha) {
-          alphaBtn.className = 'w-full p-1.5 bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/50 transition';
-          alphaTxt.innerText = 'ON (Transparente)';
-          alphaTxt.className = 'font-extrabold text-emerald-100';
-        } else {
-          alphaBtn.className = 'w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition';
-          alphaTxt.innerText = 'OFF (Opaco)';
-          alphaTxt.className = 'font-bold text-gray-400';
-        }
-      }
-
       const resInfo = document.getElementById('txt-res-pct-info');
       if (resInfo) {
         const cnt = l.count || 1;
@@ -2522,23 +2504,35 @@ def get_studio_ui_html() -> str:
       if (l.max_frames === undefined) l.max_frames = l.count || 8;
 
       const cnt = l.count || 1;
+
+      // Preservar siempre las dimensiones originales nativas para reescalado bidireccional perfecto
+      if (!l.orig_w) {
+        l.orig_w = l.orig_video_w || l.target_w || (l.width ? Math.floor(l.width / cnt) : 320);
+      }
+      if (!l.orig_h) {
+        l.orig_h = l.orig_video_h || l.target_h || (l.height || 172);
+      }
+      if (!l.fit_screen && l.orig_w > 320) {
+        l.orig_h = Math.max(1, Math.round(l.orig_h * (320 / l.orig_w)));
+        l.orig_w = 320;
+      }
+
       if (l.fit_screen) {
         l.target_w = 320;
         l.target_h = 172;
         l.x = 160;
         l.y = 86;
+      } else {
+        l.target_w = l.orig_w;
+        l.target_h = l.orig_h;
       }
-      let targetW = l.target_w || (Math.floor(l.width / cnt));
-      let targetH = l.target_h || l.height;
-      if (!l.fit_screen && targetW > 320) {
-        targetH = Math.max(1, Math.round(targetH * (320 / targetW)));
-        targetW = 320;
-        l.target_w = targetW;
-        l.target_h = targetH;
-      }
+      let targetW = l.target_w;
+      let targetH = l.target_h;
 
       if (l.type === 0x13 && (l.raw_gif_b64 || l._rawGifB64)) {
-        const rawGif = l.raw_gif_b64 || l._rawGifB64;
+        if (!l.raw_gif_b64) l.raw_gif_b64 = l._rawGifB64;
+        l._rawGifB64 = l.raw_gif_b64;
+        const rawGif = l.raw_gif_b64;
         try {
           const res = await fetch('/api/themes/convert_gif', {
             method: 'POST',
@@ -2571,13 +2565,13 @@ def get_studio_ui_html() -> str:
             l.orig_video_h = data.orig_h;
             l._origVideoW = data.orig_w;
             l._origVideoH = data.orig_h;
+            l.orig_w = data.orig_w;
+            l.orig_h = data.orig_h;
           }
           if (data.duration) l.frame_duration_ms = data.duration;
           if (data.total_duration) l.total_duration_ms = data.total_duration;
 
           // Sincronizar automáticamente el intervalo de frames en hardware (extra[2]):
-          // En el firmware del reloj, extra[2] es el retraso entre frames en centésimas / ticks de timer (10ms por tick).
-          // Se calcula 100% automáticamente para mantener la duración exacta del video con la cantidad de frames activa.
           if (!l.extra) l.extra = [0, 0, 15, 0, 0, 0, 0, 0];
           const calculatedTicks = Math.max(5, Math.min(50, Math.round((l.frame_duration_ms || 100) / 10)));
           l.extra[2] = calculatedTicks;
@@ -2587,8 +2581,13 @@ def get_studio_ui_html() -> str:
         } catch (e) {
           alert('Error aplicando procesamiento a la animación: ' + e.message);
         }
-      } else if (l._rawImgB64 || l.image_data) {
-        const rawSrc = l._rawImgB64 || l.image_data;
+      } else if (l.raw_image_b64 || l._rawImgB64 || l.image_data) {
+        // Asegurar que siempre se mantenga la imagen original en alta definición sin degradación
+        if (!l.raw_image_b64) {
+          l.raw_image_b64 = l._rawImgB64 || l.image_data;
+        }
+        l._rawImgB64 = l.raw_image_b64;
+        const rawSrc = l.raw_image_b64;
         try {
           const res = await fetch('/api/themes/optimize_image', {
             method: 'POST',
@@ -2597,8 +2596,8 @@ def get_studio_ui_html() -> str:
               target_w: targetW,
               target_h: targetH,
               mode: l.fit_screen ? 'cover' : 'fit_exact',
-              res_pct: l.res_pct,
-              max_colors: l.max_colors
+              res_pct: l.res_pct || 100,
+              max_colors: l.max_colors || 256
             })
           });
           const data = await res.json();
@@ -2636,15 +2635,6 @@ def get_studio_ui_html() -> str:
       await applyLayerProcessing(l);
     }
 
-    // Alternar canal de transparencia (Alpha) de la capa
-    function toggleLayerAlpha() {
-      const l = project.layers.find(x => x.id === selectedLayerId);
-      if (!l) return alert('Selecciona una imagen o capa primero.');
-      l.has_alpha = !l.has_alpha;
-      selectLayer(l.id);
-      drawCanvas();
-    }
-
     // 2. Modificar tamaño manual (ancho o alto) conservando resolución y compresión activas
     async function updateSelectedSize(dimension, val) {
       const l = project.layers.find(x => x.id === selectedLayerId);
@@ -2665,9 +2655,8 @@ def get_studio_ui_html() -> str:
       const resInfo = document.getElementById('txt-res-pct-info');
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (resInfo && l) {
-        const cnt = l.count || 1;
-        const baseW = l.target_w || (l.fit_screen ? 320 : Math.floor(imWidth(l) / cnt));
-        const baseH = l.target_h || (l.fit_screen ? 172 : imHeight(l));
+        const baseW = l.fit_screen ? 320 : (l.orig_w || l.orig_video_w || l.target_w || Math.floor(imWidth(l) / cnt));
+        const baseH = l.fit_screen ? 172 : (l.orig_h || l.orig_video_h || l.target_h || imHeight(l));
         const estW = Math.max(16, Math.round(baseW * parseInt(val) / 100));
         const estH = Math.max(16, Math.round(baseH * parseInt(val) / 100));
         resInfo.innerText = `${val}% (~${estW}×${estH} px)`;
@@ -2752,9 +2741,8 @@ def get_studio_ui_html() -> str:
         if (!l.visible) continue;
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
-        const fh = imHeight(l);
-        const dw = l.fit_screen ? 320 : fw;
-        const dh = l.fit_screen ? 172 : fh;
+        const dw = l.fit_screen ? 320 : (l.target_w || l.orig_w || fw);
+        const dh = l.fit_screen ? 172 : (l.target_h || l.orig_h || fh);
         const lx = l.fit_screen ? 160 : l.x;
         const ly = l.fit_screen ? 86 : l.y;
         if (mx >= lx - dw / 2 && mx <= lx + dw / 2 && my >= ly - dh / 2 && my <= ly + dh / 2) {
@@ -2846,8 +2834,13 @@ def get_studio_ui_html() -> str:
                 x: 160, y: 86, has_alpha: imgHasAlpha,
                 fit_screen: !imgHasAlpha,
                 width: im.width, height: im.height,
-                target_w: imgHasAlpha ? im.width : 320, target_h: imgHasAlpha ? im.height : 172,
-                image_data: finalB64, _rawImgB64: finalB64,
+                orig_w: imgHasAlpha ? im.width : 320,
+                orig_h: imgHasAlpha ? im.height : 172,
+                target_w: imgHasAlpha ? im.width : 320,
+                target_h: imgHasAlpha ? im.height : 172,
+                image_data: finalB64,
+                raw_image_b64: finalB64,
+                _rawImgB64: finalB64,
                 res_pct: 100, max_colors: 256,
                 extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
               };
@@ -2859,11 +2852,16 @@ def get_studio_ui_html() -> str:
                 id: 'layer_overlay_' + Date.now(),
                 name: 'Personaje PNG (Profundidad)',
                 type: 0x10, mode: 2, count: 1, fmt: 1,
-                x: 160, y: 86, has_alpha: true,
+                x: 160, y: 86, has_alpha: imgHasAlpha,
                 fit_screen: false,
                 width: im.width, height: im.height,
-                target_w: im.width, target_h: im.height,
-                image_data: finalB64, _rawImgB64: finalB64,
+                orig_w: im.width,
+                orig_h: im.height,
+                target_w: im.width,
+                target_h: im.height,
+                image_data: finalB64,
+                raw_image_b64: finalB64,
+                _rawImgB64: finalB64,
                 res_pct: 100, max_colors: 256,
                 extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
               };
