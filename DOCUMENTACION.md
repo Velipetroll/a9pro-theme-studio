@@ -300,51 +300,19 @@ Se descubrió que la aplicación oficial:
 3. Lo transmite con el comando `0x93`.
 4. Esta llamada se efectúa de manera automática tras recibir la respuesta al comando `0x27` (`_parseDeviceInfo`). En la app oficial ni siquiera existe un botón de ajuste manual.
 
-### La Causa Raíz: Firmware con Hora de Beijing (UTC+8)
+### Comportamiento del Hardware: Virtual RTC y Memoria Flash
 
-¿Por qué este código funcionaba en China pero fallaba en el resto del mundo?
-- Los ingenieros de JieLi en Zhuhai, China, asumieron que el reloj siempre funcionaría bajo la **Hora Estándar de China (Beijing, CST = UTC+8)**.
-- El firmware del microcontrolador en la caja calcula la hora que pinta en pantalla sumando de forma fija **8 horas** a la marca de tiempo Unix recibida:
-  $$\text{Hora Mostrada en Caja} = \text{Timestamp Recibido (UTC)} + 8\text{ horas}$$
-- En China, como el teléfono está en UTC+8, al enviar la marca de tiempo UTC el firmware le sumaba 8 horas y el resultado coincidía exactamente con la hora de su país.
-- Sin embargo, en países de América Latina como **Colombia o Perú (UTC-5)**:
-  $$\text{Hora Local Real} = \text{UTC} - 5\text{ horas}$$
-  Al recibir el timestamp estándar, la caja sumaba 8 horas, generando un desfase masivo hacia adelante:
-  $$\text{Desfase Total} = (+8\text{h}) - (-5\text{h}) = \mathbf{+13\text{ horas de error}}$$
+Durante las investigaciones de ingeniería inversa y pruebas directas con el hardware, se identificó el comportamiento exacto del reloj interno de la caja:
 
-### Deducción y Fórmula de Compensación para Colombia / Perú (UTC-5)
+1. **Arquitectura Virtual RTC (`virtual_rtc.c` de JieLi):**
+   - El microcontrolador JieLi de la caja A9 Pro utiliza un reloj por software/oscilador interno que no cuenta con una batería RTC independiente permanente.
+   - Para no desgastar los ciclos de vida de la memoria Flash SPI interna escribiendo cada segundo, el firmware de la caja guarda puntos de restauración (*checkpoints*) del tiempo transcurrido en la memoria Flash en **lotes periódicos (cada 15 a 20 minutos)**.
+   - Cuando la caja se apaga completamente (apagado total) y se vuelve a encender, la memoria RAM volátil se reinicia y el chip restaura el último checkpoint guardado en la memoria Flash (ocurrido hasta 20 minutos antes). Por este motivo, el reloj retrocede en bloques de ~20 minutos tras un apagado total.
 
-La confirmación empírica definitiva ocurrió cuando se aplicó una prueba con `-15h` a la 01:05 am:
-$$\text{Timestamp Enviado} = 01:05\text{ am} - 15\text{h} = 10:05\text{ am (día previo)}$$
-$$\text{Hora Calculada por Caja} = 10:05\text{ am} + 8\text{h} = 11:05\text{ pm}$$
-Exactamente 15 minutos después (a la 01:20 am), el usuario reinició la caja y la pantalla mostró con exactitud **11:20 pm**.
-
-Esto demostró que:
-1. El chip RTC sí almacena y avanza el tiempo con el comando `0x93`.
-2. Para que la pantalla de la caja muestre la hora local del usuario en UTC-5, la ecuación es:
-   $$\text{Hora Deseada en Pantalla} = \text{Timestamp Enviado} + 8\text{ horas}$$
-   $$\text{Hora Local} = \text{Timestamp Enviado} + 8\text{ horas}$$
-   $$\text{Timestamp Enviado} = \text{Hora Local} - 8\text{ horas}$$
-   Y dado que en Python `time.time()` devuelve UTC, y la hora local es $\text{UTC} - 5\text{h}$:
-   $$\text{Timestamp Enviado} = (\text{time.time()} - 5\text{h}) - 8\text{h} = \mathbf{\text{time.time()} - 13\text{ horas}}$$
-
-**Fórmula Maestra Implementada:**
-```python
-def sync_time(self, offset_hours: float = -13.0) -> bool:
-    target_ts = int(time.time() + (offset_hours * 3600))
-    payload = struct.pack("<I", target_ts)
-    return self.send_raw_command(0x93, payload, use_req=True)
-```
-
-### Ciclo de Redibujado de la Pantalla LCD
-
-El microcontrolador JieLi actualiza sus registros internos de RTC inmediatamente al recibir el comando `0x93`. No obstante, el subsistema de interfaz gráfica (UI) no siempre redibuja los números en el mismo milisegundo si la pantalla está encendida y estática.
-
-La pantalla LCD refresca los dígitos visuales desde el chip RTC en cualquiera de los siguientes eventos:
-1. Al suspender y reactivar la pantalla (presionar el botón lateral para apagar la pantalla y volverlo a presionar).
-2. Al deslizar el dedo hacia otra pantalla del sistema (ej. linterna o ajustes) y regresar a la esfera principal.
-3. Al alcanzar el siguiente cambio de minuto en el temporizador (`:00`).
-4. Al apagar o reiniciar el estuche.
+2. **Aislamiento del Reloj respecto a BLE:**
+   - En las pruebas de inyección directa de tramas (tanto con timestamps UNIX de 4 bytes como con la estructura nativa `struct sys_time` de 7 bytes del SDK JieLi: año, mes, día, hora, min, seg), el subsistema de la pantalla y el calendario interno no aplican cambios forzados desde el canal BLE de la caja.
+   - En este modelo de hardware, el reloj interno opera de forma autónoma con su propio ciclo interno.
+   - **Decisión de Diseño:** Con el objetivo de mantener la aplicación 100% limpia, robusta y libre de controles ineficaces, se eliminaron los botones y endpoints de sincronización de hora tanto de la interfaz gráfica como del servidor, manteniendo el estudio enfocado exclusivamente en las funciones verificadas y de alto impacto: personalización visual multicapa, conversor GIF, carga de fuentes, galería oficial y telemetría de batería.
 
 ---
 
@@ -404,8 +372,9 @@ Insertar animaciones GIF completas en la caja A9 Pro era inviable con las herram
 ### Herramienta CLI de Bajo Nivel (`a9pro_tool.py`)
 Para operaciones avanzadas y entornos sin entorno gráfico, `a9pro_tool.py` ofrece utilidades directas:
 - `python3 a9pro_tool.py info --mac 41:42:6C:C2:DD:3C`: Inspecciona las dimensiones de pantalla, capacidades y MTU.
-- `python3 a9pro_tool.py time --offset -13.0`: Sincroniza la hora con la compensación deseada.
 - `python3 a9pro_tool.py build --bg fondo.png --thumb icono.png`: Compila una esfera personalizada desde la terminal.
+- `python3 a9pro_tool.py inspect archivo.bin --extract salida/`: Inspecciona y extrae todas las capas de un archivo de esfera.
+- `python3 a9pro_tool.py upload archivo.bin`: Envía un archivo `.bin` compilado directamente a la caja vía BLE.
 
 ---
 
@@ -419,7 +388,6 @@ El servidor expone una API JSON en `http://localhost:8765/api/`:
 | `GET` | `/api/connect` | Ninguno | `{"success": true}` | Conecta el socket L2CAP a la dirección MAC configurada. |
 | `GET` | `/api/disconnect` | Ninguno | `{"success": true}` | Cierra el socket L2CAP de forma limpia y detiene el worker. |
 | `GET` | `/api/query` | Ninguno | `{"success": true}` | Fuerza un sondeo completo de todos los tags TLV a la caja. |
-| `POST` | `/api/control/sync_time` | `{"offset_hours": -13.0}` | `{"success": true, "offset_hours": -13.0}` | Sincroniza el reloj RTC del microcontrolador. |
 | `POST` | `/api/control/noise_mode` | `{"mode": 0}` (0=ANC, 1=Normal, 2=Transp.) | `{"success": true}` | Modifica el modo de cancelación de ruido activa. |
 | `POST` | `/api/control/work_mode` | `{"mode": 0}` (0=Música, 1=Juego, 2=Cine) | `{"success": true}` | Modifica el perfil de latencia y ecualización de trabajo. |
 | `POST` | `/api/control/eq` | `{"preset": 1, "bands": [0,0,0,...]}` | `{"success": true}` | Ajusta el perfil del ecualizador DSP de 10 bandas. |
