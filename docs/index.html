@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A9 Pro Studio - 100% Nativo en Navegador</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Catálogo de las 80 esferas oficiales embebido -->
+  <script src="themes_catalog.js"></script>
+  <script src="pa_decoder.js"></script>
+  <style>
+    body { background-color: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .screen-bezel { background: #000; border: 4px solid #1f2937; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7); }
+    .slider-vertical { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 100px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Header Superior -->
+  <header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg">A9</div>
+      <div>
+        <h1 class="text-base font-bold leading-tight flex items-center gap-2">
+          A9 Pro Studio
+          <span id="badge-conn" class="text-xs px-2 py-0.5 rounded-full bg-red-900/60 text-red-400 border border-red-700/50">Desconectado</span>
+        </h1>
+        <p class="text-xs text-gray-400">100% en tu navegador (Sin comandos ni servidor Python)</p>
+      </div>
+    </div>
+
+    <!-- Navegación de Pestañas -->
+    <nav class="flex space-x-1 bg-gray-800/80 p-1 rounded-xl border border-gray-700/50">
+      <button onclick="setTab('device')" id="btn-tab-device" class="px-4 py-1.5 rounded-lg text-sm font-medium transition bg-blue-600 text-white shadow">📱 Mi Dispositivo</button>
+      <button onclick="setTab('gallery')" id="btn-tab-gallery" class="px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white">📚 Tienda Oficial (80 Temas)</button>
+      <button onclick="setTab('studio')" id="btn-tab-studio" class="px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white">🎨 Personalizador</button>
+    </nav>
+
+    <!-- Conexión Web Bluetooth & Enlaces -->
+    <div class="flex items-center space-x-2">
+      <a href="https://github.com/Velipetroll/a9pro-theme-studio/blob/main/DOCUMENTACION.md" target="_blank" class="hidden sm:flex px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 transition items-center gap-1">
+        📖 Docs
+      </a>
+      <a href="https://github.com/Velipetroll/a9pro-theme-studio" target="_blank" class="hidden sm:flex px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 transition items-center gap-1">
+        ⭐ GitHub
+      </a>
+      <button onclick="toggleWebBluetooth()" id="btn-conn" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow transition flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+        <span id="btn-conn-text">Conectar Bluetooth</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Contenido Principal -->
+  <main class="flex-1 p-6 max-w-7xl mx-auto w-full">
+
+    <!-- ==================== PESTAÑA 1: DISPOSITIVO ORIGINAL ==================== -->
+    <section id="tab-device" class="space-y-6">
+      
+      <!-- Fila Superior: Renders del Dispositivo y Batería -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Audífono Izquierdo (L) -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden">
+          <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Audífono Izquierdo (L)</span>
+          <img src="assets/left_earphone.png" class="h-36 my-3 object-contain drop-shadow-xl" alt="Left Earbud">
+          <div class="w-full space-y-1">
+            <div class="flex justify-between items-center text-sm font-semibold">
+              <span id="txt-bat-l">0%</span>
+              <span id="icon-charge-l" class="text-xs text-amber-400 hidden">⚡ Cargando</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+              <div id="bar-bat-l" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estuche Inteligente A9 Pro Box -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden shadow-2xl">
+          <div class="flex items-center justify-between w-full">
+            <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Caja Inteligente A9 Pro Box</span>
+            <span id="txt-firmware" class="text-xs text-gray-500 font-mono">v3.4.0.0</span>
+          </div>
+          
+          <div class="relative my-2 flex items-center justify-center">
+            <img src="assets/connected.png" class="h-44 object-contain" alt="A9 Pro Box">
+            <div class="absolute w-[145px] h-[78px] top-[46px] rounded-md overflow-hidden bg-black flex flex-col items-center justify-center text-white border border-gray-900 pointer-events-none shadow-inner">
+              <div class="text-[9px] text-gray-400 flex justify-between w-full px-1.5 pt-0.5">
+                <span>L <b id="screen-l">0%</b> R <b id="screen-r">0%</b></span>
+                <span id="screen-box">🔋 0%</span>
+              </div>
+              <div id="screen-clock" class="text-lg font-black tracking-tight text-white mt-1">12:00</div>
+              <div id="screen-date" class="text-[8px] text-blue-300 font-medium">DOM 10/24</div>
+            </div>
+          </div>
+
+          <div class="w-full space-y-1">
+            <div class="flex justify-between items-center text-sm font-semibold">
+              <span id="txt-bat-box">0%</span>
+              <span id="icon-charge-box" class="text-xs text-amber-400 hidden">⚡ Cargando</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+              <div id="bar-bat-box" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audífono Derecho (R) -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden">
+          <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Audífono Derecho (R)</span>
+          <img src="assets/right_earphone.png" class="h-36 my-3 object-contain drop-shadow-xl" alt="Right Earbud">
+          <div class="w-full space-y-1">
+            <div class="flex justify-between items-center text-sm font-semibold">
+              <span id="txt-bat-r">0%</span>
+              <span id="icon-charge-r" class="text-xs text-amber-400 hidden">⚡ Cargando</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+              <div id="bar-bat-r" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Barra de Acciones Rápidas -->
+      <div class="bg-gray-900/80 border border-gray-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-3">
+          <button onclick="queryDeviceStatus()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-lg shadow transition flex items-center gap-2">
+            🔄 Solicitar Batería e Info Ahora
+          </button>
+          <button onclick="syncTimeToBox()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium text-sm rounded-lg border border-gray-700 transition flex items-center gap-2">
+            🕒 Sincronizar Reloj de la Caja
+          </button>
+        </div>
+        <div class="flex items-center space-x-2 text-xs text-gray-400">
+          <span>Servicio: <b class="font-mono text-gray-200">0xFDB3 (RX/TX)</b></span>
+          <span>|</span>
+          <span>Pantalla: <b class="text-gray-200">320×172 px</b></span>
+          <span>|</span>
+          <span>Límite: <b class="text-gray-200">153.6 KB</b></span>
+        </div>
+      </div>
+
+      <!-- Fila de Controles (ANC, Modos, Ecualizador) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Control de Ruido (ANC) -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400">Control de Ruido</h2>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="sendNoiseMode(0)" id="btn-anc-0" class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
+              <img src="assets/immerse_blue.png" class="w-8 h-8 mb-2 object-contain" alt="ANC">
+              <span class="text-xs font-semibold">Cancelación</span>
+            </button>
+            <button onclick="sendNoiseMode(1)" id="btn-anc-1" class="flex flex-col items-center justify-center p-3 rounded-xl border border-blue-500 bg-blue-950/40 transition">
+              <img src="assets/mild_blue.png" class="w-8 h-8 mb-2 object-contain" alt="Normal">
+              <span class="text-xs font-semibold">Normal</span>
+            </button>
+            <button onclick="sendNoiseMode(2)" id="btn-anc-2" class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
+              <img src="assets/transparent_blue.png" class="w-8 h-8 mb-2 object-contain" alt="Transparente">
+              <span class="text-xs font-semibold">Ambiente</span>
+            </button>
+          </div>
+
+          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 pt-2">Modo de Sonido</h2>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="sendWorkMode(0)" id="btn-work-0" class="flex flex-col items-center p-2.5 rounded-xl border border-blue-500 bg-blue-950/40 transition">
+              <img src="assets/music_mode.png" class="w-7 h-7 mb-1 object-contain" alt="Música">
+              <span class="text-xs font-medium">Música</span>
+            </button>
+            <button onclick="sendWorkMode(1)" id="btn-work-1" class="flex flex-col items-center p-2.5 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
+              <img src="assets/game_mode.png" class="w-7 h-7 mb-1 object-contain" alt="Juego">
+              <span class="text-xs font-medium">Baja Latencia</span>
+            </button>
+            <button onclick="sendWorkMode(2)" id="btn-work-2" class="flex flex-col items-center p-2.5 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
+              <img src="assets/movie_mode.png" class="w-7 h-7 mb-1 object-contain" alt="Película">
+              <span class="text-xs font-medium">Película</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Ecualizador de 10 Bandas -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+              <img src="assets/main_eq_sign.png" class="w-4 h-4 object-contain" alt="EQ">
+              Ecualizador 10 Bandas
+            </h2>
+            <select id="sel-eq-preset" onchange="applyEqPreset(this.value)" class="text-xs bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-gray-200">
+              <option value="0">Estándar</option>
+              <option value="1">Pop</option>
+              <option value="2">Rock</option>
+              <option value="3">Jazz</option>
+              <option value="4">Clásica</option>
+              <option value="5">Vocal</option>
+            </select>
+          </div>
+
+          <div class="flex justify-between items-center px-1 pt-2">
+            <div id="eq-sliders-container" class="flex justify-between w-full text-center"></div>
+          </div>
+          <button onclick="sendEqCommand()" class="w-full py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-xs font-semibold text-gray-200 transition">
+            Aplicar Ecualización a la Caja
+          </button>
+        </div>
+
+        <!-- Buscar Audífonos & Ajustes -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+            <img src="assets/main_find.png" class="w-4 h-4 object-contain" alt="Find">
+            Buscar Mis Audífonos (Beep)
+          </h2>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="sendFindEarbuds(true, false)" class="p-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-semibold transition">
+              Izquierdo (L)
+            </button>
+            <button onclick="sendFindEarbuds(false, true)" class="p-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-semibold transition">
+              Derecho (R)
+            </button>
+            <button onclick="sendFindEarbuds(true, true)" class="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition">
+              Ambos 🔊
+            </button>
+          </div>
+
+          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 pt-3 flex items-center gap-2">
+            <img src="assets/main_gesture_control.png" class="w-4 h-4 object-contain" alt="Gestures">
+            Información de la Caja
+          </h2>
+          <div class="text-xs text-gray-400 space-y-2">
+            <div class="flex justify-between items-center bg-gray-800/40 p-2 rounded-lg">
+              <span>Resolución Pantalla</span>
+              <span class="text-gray-200 font-semibold">320 × 172 px</span>
+            </div>
+            <div class="flex justify-between items-center bg-gray-800/40 p-2 rounded-lg">
+              <span>Formato de Sprites</span>
+              <span class="text-gray-200 font-semibold">PA (RLE + Canal Alfa)</span>
+            </div>
+            <div class="flex justify-between items-center bg-gray-800/40 p-2 rounded-lg">
+              <span>Bluetooth Web API</span>
+              <span class="text-emerald-400 font-semibold">Nativo en Navegador</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==================== PESTAÑA 2: TIENDA OFICIAL (80 TEMAS) ==================== -->
+    <section id="tab-gallery" class="space-y-6 hidden">
+      <div class="flex items-center justify-between bg-gray-900 border border-gray-800 p-4 rounded-2xl">
+        <div>
+          <h2 class="text-base font-bold flex items-center gap-2">
+            📚 Catálogo Oficial de 80 Esferas (320×172)
+            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 font-mono">80 temas offline</span>
+          </h2>
+          <p class="text-xs text-gray-400">Totalmente integrado en el navegador. Haz clic en 'Subir' para flashear directo por Bluetooth o en 'Editar' para abrirlo en el Personalizador.</p>
+        </div>
+      </div>
+
+      <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <!-- Render dinámico de temas -->
+      </div>
+    </section>
+
+    <!-- ==================== PESTAÑA 3: PERSONALIZADOR DE TEMAS ==================== -->
+    <section id="tab-studio" class="space-y-6 hidden">
+      <div class="flex flex-wrap items-center justify-between gap-4 bg-gray-900 border border-gray-800 p-4 rounded-2xl">
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-bold">Lienzo 320×172</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400 font-mono">Zoom 2.5×</span>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <button onclick="downloadCustomBin()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm font-semibold rounded-xl border border-gray-700 transition">
+            💾 Descargar .bin
+          </button>
+          <button onclick="uploadCanvasThemeDirect()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+            🚀 Subir a la Caja por Bluetooth
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="lg:col-span-8 flex flex-col items-center justify-center p-6 bg-gray-900 border border-gray-800 rounded-2xl space-y-4">
+          <div class="relative screen-bezel p-1">
+            <canvas id="theme-canvas" width="320" height="172" class="w-[800px] h-[430px] rounded cursor-crosshair bg-black block"></canvas>
+            <div class="absolute top-2 left-3 right-3 flex justify-between items-center text-[11px] text-white/90 font-semibold px-2 pointer-events-none drop-shadow">
+              <span>L 100%  R 100%</span>
+              <span>🔋 100%</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <label class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold cursor-pointer border border-gray-700 transition">
+              🖼️ Fondo (320×172)
+              <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event, 'background')">
+            </label>
+            <label class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold cursor-pointer border border-gray-700 transition">
+              🦸 Personaje PNG (Profundidad)
+              <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event, 'overlay')">
+            </label>
+            <button onclick="addClockWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
+              🕒 Reloj Digital
+            </button>
+            <button onclick="addDateWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
+              📅 Fecha & Día (DOM 10/24)
+            </button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-4 space-y-4">
+          <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Capas del Tema</h3>
+            <div id="layers-list" class="space-y-2 max-h-[220px] overflow-y-auto pr-1"></div>
+          </div>
+
+          <div id="inspector-panel" class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Ajuste de Posición</h3>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <label class="text-gray-400">Posición X</label>
+                <input type="number" id="inp-x" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 mt-1 text-white" onchange="updateSelectedCoord('x', this.value)">
+              </div>
+              <div>
+                <label class="text-gray-400">Posición Y</label>
+                <input type="number" id="inp-y" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 mt-1 text-white" onchange="updateSelectedCoord('y', this.value)">
+              </div>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+              <button onclick="moveLayerUp()" class="flex-1 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs font-semibold">⬆️ Subir</button>
+              <button onclick="moveLayerDown()" class="flex-1 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs font-semibold">⬇️ Bajar</button>
+              <button onclick="deleteLayer()" class="py-1 px-3 bg-red-900/40 text-red-400 hover:bg-red-800/60 rounded text-xs font-semibold">🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal de Progreso Bluetooth -->
+  <div id="modal-upload" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full mx-4 space-y-4 text-center">
+      <h3 class="text-lg font-bold">Transmitiendo Esfera a la A9 Pro Box</h3>
+      <p class="text-xs text-gray-400">Transmisión Web Bluetooth directa...</p>
+      <div class="w-full bg-gray-800 rounded-full h-4 overflow-hidden">
+        <div id="upload-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between items-center text-xs text-gray-400">
+        <span id="upload-pct">0%</span>
+        <span id="upload-packets">0 / 0 paquetes</span>
+      </div>
+      <div id="upload-msg" class="text-xs font-semibold text-blue-400">Conectando...</div>
+      <button onclick="document.getElementById('modal-upload').classList.add('hidden')" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold">
+        Cerrar
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ==================== WEB BLUETOOTH NATIVO ====================
+    const SERVICE_UUID = "0000fdb3-0000-1000-8000-00805f9b34fb";
+    const CHAR_RX_NOTIFY = "0000ff18-0000-1000-8000-00805f9b34fb";
+    const CHAR_TX_WRITE  = "0000ff17-0000-1000-8000-00805f9b34fb";
+
+    let bleDevice = null;
+    let bleServer = null;
+    let rxChar = null;
+    let txChar = null;
+    let isConnected = false;
+    let packetSeq = 0;
+
+    async function toggleWebBluetooth() {
+      if (isConnected) {
+        if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+        onDisconnected();
+      } else {
+        try {
+          if (!navigator.bluetooth) {
+            alert("Tu navegador no soporta Web Bluetooth. Usa Google Chrome, Brave, Opera o Edge.");
+            return;
+          }
+          document.getElementById('btn-conn-text').innerText = 'Emparejando...';
+          
+          bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: "A9" }, { services: [SERVICE_UUID] }],
+            optionalServices: [SERVICE_UUID]
+          });
+
+          bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+          bleServer = await bleDevice.gatt.connect();
+          const service = await bleServer.getPrimaryService(SERVICE_UUID);
+
+          rxChar = await service.getCharacteristic(CHAR_RX_NOTIFY);
+          txChar = await service.getCharacteristic(CHAR_TX_WRITE);
+
+          await rxChar.startNotifications();
+          rxChar.addEventListener('characteristicvaluechanged', handleNotification);
+
+          isConnected = true;
+          document.getElementById('badge-conn').className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-400 border border-emerald-700/50';
+          document.getElementById('badge-conn').innerText = 'Conectado';
+          document.getElementById('btn-conn-text').innerText = 'Desconectar';
+
+          queryDeviceStatus();
+        } catch (e) {
+          console.error("Fallo de conexión Web Bluetooth:", e);
+          onDisconnected();
+          alert("No se pudo conectar: " + e.message);
+        }
+      }
+    }
+
+    function onDisconnected() {
+      isConnected = false;
+      document.getElementById('badge-conn').className = 'text-xs px-2 py-0.5 rounded-full bg-red-900/60 text-red-400 border border-red-700/50';
+      document.getElementById('badge-conn').innerText = 'Desconectado';
+      document.getElementById('btn-conn-text').innerText = 'Conectar Bluetooth';
+    }
+
+    function handleNotification(event) {
+      const dataView = event.target.value;
+      const raw = new Uint8Array(dataView.buffer);
+      if (raw.length >= 5 && (raw[1] === 0x27 || raw[1] === 0x28)) {
+        parseTLV(raw);
+      }
+    }
+
+    function parseTLV(raw) {
+      let idx = 5;
+      while (idx + 2 <= raw.length) {
+        const tag = raw[idx];
+        const ln = raw[idx + 1];
+        const val = raw.slice(idx + 2, idx + 2 + ln);
+        idx += 2 + ln;
+
+        if (tag === 0x01 && val.length >= 3) {
+          const bl = val[0] & 0x7F;
+          const br = val[1] & 0x7F;
+          const bb = val[2] & 0x7F;
+          const cl = (val[0] & 0x80) !== 0;
+          const cr = (val[1] & 0x80) !== 0;
+          const cb = (val[2] & 0x80) !== 0;
+
+          document.getElementById('txt-bat-l').innerText = `${bl}%`;
+          document.getElementById('bar-bat-l').style.width = `${bl}%`;
+          document.getElementById('icon-charge-l').classList.toggle('hidden', !cl);
+
+          document.getElementById('txt-bat-r').innerText = `${br}%`;
+          document.getElementById('bar-bat-r').style.width = `${br}%`;
+          document.getElementById('icon-charge-r').classList.toggle('hidden', !cr);
+
+          document.getElementById('txt-bat-box').innerText = `${bb}%`;
+          document.getElementById('bar-bat-box').style.width = `${bb}%`;
+          document.getElementById('icon-charge-box').classList.toggle('hidden', !cb);
+
+          document.getElementById('screen-l').innerText = `${bl}%`;
+          document.getElementById('screen-r').innerText = `${br}%`;
+          document.getElementById('screen-box').innerText = `🔋 ${bb}%`;
+        } else if (tag === 0x02 && val.length >= 4) {
+          document.getElementById('txt-firmware').innerText = `v${val[0]}.${val[1]}.${val[2]}.${val[3]}`;
+        }
+      }
+    }
+
+    function buildBlePacket(cmd, payload) {
+      packetSeq = (packetSeq + 1) & 0x0F;
+      const pkt = new Uint8Array(5 + payload.length);
+      pkt[0] = 0xAA;
+      pkt[1] = cmd & 0xFF;
+      pkt[2] = packetSeq;
+      pkt[3] = payload.length & 0xFF;
+      pkt[4] = (payload.length >> 8) & 0xFF;
+      pkt.set(payload, 5);
+      return pkt;
+    }
+
+    async function sendBleCommand(cmd, payload) {
+      if (!txChar || !isConnected) {
+        alert("Primero conecta la caja con el botón 'Conectar Bluetooth'");
+        return;
+      }
+      const pkt = buildBlePacket(cmd, payload);
+      await txChar.writeValueWithoutResponse(pkt);
+    }
+
+    async function queryDeviceStatus() {
+      const tags = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 21, 254, 22, 128, 129, 130, 131, 255];
+      const payload = new Uint8Array(tags.length * 2);
+      for (let i = 0; i < tags.length; i++) {
+        payload[i * 2] = tags[i];
+        payload[i * 2 + 1] = 0;
+      }
+      await sendBleCommand(0x27, payload);
+    }
+
+    async function sendNoiseMode(m) {
+      await sendBleCommand(0x2C, new Uint8Array([m & 0xFF]));
+      [0, 1, 2].forEach(idx => {
+        document.getElementById(`btn-anc-${idx}`).className = (idx === m)
+          ? 'flex flex-col items-center justify-center p-3 rounded-xl border border-blue-500 bg-blue-950/40 transition'
+          : 'flex flex-col items-center justify-center p-3 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition';
+      });
+    }
+
+    async function sendWorkMode(m) {
+      await sendBleCommand(0x25, new Uint8Array([m & 0xFF]));
+      [0, 1, 2].forEach(idx => {
+        document.getElementById(`btn-work-${idx}`).className = (idx === m)
+          ? 'flex flex-col items-center p-2.5 rounded-xl border border-blue-500 bg-blue-950/40 transition'
+          : 'flex flex-col items-center p-2.5 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition';
+      });
+    }
+
+    async function sendFindEarbuds(l, r) {
+      const mask = (l ? 1 : 0) | (r ? 2 : 0);
+      await sendBleCommand(0x37, new Uint8Array([mask]));
+    }
+
+    async function syncTimeToBox() {
+      // El firmware JieLi en la caja A9 Pro suma automáticamente +8 horas (CST / Beijing).
+      // Para que la caja muestre la hora local en cualquier zona horaria:
+      // target_ts = UTC - (8 - tzHours)
+      const tzHours = -(new Date().getTimezoneOffset() / 60);
+      const offsetSeconds = (8 - tzHours) * 3600;
+      const targetTs = Math.floor(Date.now() / 1000) - offsetSeconds;
+
+      const buf = new Uint8Array(4);
+      buf[0] = targetTs & 0xFF;
+      buf[1] = (targetTs >> 8) & 0xFF;
+      buf[2] = (targetTs >> 16) & 0xFF;
+      buf[3] = (targetTs >> 24) & 0xFF;
+
+      await sendBleCommand(0x93, buf);
+      alert("¡Hora sincronizada con la caja A9 Pro! (Compensación de zona horaria aplicada). Si la pantalla no cambia de inmediato, apágala y préndela con el botón lateral para refrescar dígitos.");
+    }
+
+    // ==================== SUBIDA DE ESFERA DIRECTA POR WEB BLUETOOTH ====================
+    async function uploadBinDataDirect(binData) {
+      if (!txChar || !isConnected) {
+        alert("Primero conecta la caja con el botón 'Conectar Bluetooth'");
+        return;
+      }
+
+      document.getElementById('modal-upload').classList.remove('hidden');
+      document.getElementById('upload-bar').style.width = '0%';
+      document.getElementById('upload-pct').innerText = '0%';
+      document.getElementById('upload-msg').innerText = 'Iniciando transferencia Web Bluetooth...';
+
+      const chunkSize = 112; // face_mtu(128) - 16
+      const totalPackages = Math.ceil(binData.length / chunkSize);
+
+      // Paquete de inicio (cmd 0x87)
+      const startPkt = new Uint8Array(15);
+      startPkt[0] = 0xAA;
+      startPkt[1] = 0x87;
+      startPkt[2] = 0x01;
+      startPkt[3] = 0x00;
+      startPkt[4] = 0x0A;
+      startPkt[5] = 0x01;
+      startPkt[6] = totalPackages & 0xFF; startPkt[7] = (totalPackages >> 8) & 0xFF;
+      startPkt[8] = binData.length & 0xFF; startPkt[9] = (binData.length >> 8) & 0xFF;
+      startPkt[10] = (binData.length >> 16) & 0xFF; startPkt[11] = (binData.length >> 24) & 0xFF;
+      startPkt[12] = 128; startPkt[13] = 0;
+      startPkt[14] = 0;
+
+      await txChar.writeValueWithoutResponse(startPkt);
+      await new Promise(r => setTimeout(r, 600));
+
+      let pkgIndex = 0;
+      let burstCount = 0;
+
+      while (pkgIndex < totalPackages) {
+        const offset = pkgIndex * chunkSize;
+        const chunk = binData.subarray(offset, Math.min(offset + chunkSize, binData.length));
+        const isLast = (pkgIndex + 1) === totalPackages;
+        const control = isLast ? 1 : (burstCount === 9 ? 0 : 3);
+        const progress = Math.min(100, Math.floor(((pkgIndex + 1) * 100) / totalPackages));
+
+        const pkt = new Uint8Array(16 + chunk.length);
+        pkt[0] = 0xAA;
+        pkt[1] = 0x87;
+        pkt[2] = 0x01;
+        pkt[3] = 0x00;
+        pkt[4] = (chunk.length + 11) & 0xFF;
+        pkt[5] = 0x02;
+        pkt[6] = (pkgIndex + 1) & 0xFF; pkt[7] = ((pkgIndex + 1) >> 8) & 0xFF;
+        pkt[8] = offset & 0xFF; pkt[9] = (offset >> 8) & 0xFF;
+        pkt[10] = (offset >> 16) & 0xFF; pkt[11] = (offset >> 24) & 0xFF;
+        pkt[12] = progress & 0xFF;
+        pkt[13] = control;
+
+        let chk = 0;
+        for (let b of chunk) chk = (chk + b) & 0xFFFF;
+        pkt[14] = chk & 0xFF; pkt[15] = (chk >> 8) & 0xFF;
+        pkt.set(chunk, 16);
+
+        await txChar.writeValueWithoutResponse(pkt);
+        pkgIndex++;
+        burstCount++;
+
+        document.getElementById('upload-bar').style.width = `${progress}%`;
+        document.getElementById('upload-pct').innerText = `${progress}%`;
+        document.getElementById('upload-packets').innerText = `${pkgIndex} / ${totalPackages} paquetes`;
+
+        if (control === 0 || control === 1) {
+          burstCount = 0;
+          await new Promise(r => setTimeout(r, 40));
+        } else {
+          await new Promise(r => setTimeout(r, 8));
+        }
+      }
+
+      document.getElementById('upload-msg').innerText = '🎉 ¡Tema sincronizado exitosamente con la A9 Pro Box!';
+    }
+
+    // ==================== GALERÍA OFICIAL ====================
+    function renderOfficialGallery() {
+      const grid = document.getElementById('gallery-grid');
+      grid.innerHTML = '';
+
+      if (typeof OFFICIAL_THEMES_CATALOG === 'undefined' || !OFFICIAL_THEMES_CATALOG.length) {
+        grid.innerHTML = '<div class="col-span-4 text-center py-8 text-gray-500">No se encontró el catálogo de temas.</div>';
+        return;
+      }
+
+      OFFICIAL_THEMES_CATALOG.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-900 border border-gray-800 rounded-xl p-3 flex flex-col items-center space-y-2 hover:border-blue-500/50 transition';
+        card.innerHTML = `
+          <div class="w-full h-24 bg-black rounded-lg overflow-hidden flex items-center justify-center">
+            ${item.thumb ? `<img src="${item.thumb}" class="w-full h-full object-cover">` : '<span class="text-xs text-gray-600">Sin vista</span>'}
+          </div>
+          <div class="w-full flex justify-between items-center text-[10px] text-gray-400">
+            <span class="truncate font-mono">${item.name}</span>
+            <span>${Math.round(item.size / 1024)} KB</span>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 w-full pt-1">
+            <button onclick="loadOfficialToStudio('${item.file}')" class="py-1 px-2 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-200">
+              ✏️ Editar
+            </button>
+            <button onclick="uploadOfficialTheme('${item.file}')" class="py-1 px-2 bg-blue-600/80 hover:bg-blue-600 rounded text-[11px] font-semibold text-white">
+              📤 Subir
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    async function uploadOfficialTheme(binFile) {
+      try {
+        const res = await fetch(`official_bins/${binFile}`);
+        const buf = await res.arrayBuffer();
+        await uploadBinDataDirect(new Uint8Array(buf));
+      } catch (e) {
+        alert("Error cargando el archivo .bin: " + e.message);
+      }
+    }
+
+    async function loadOfficialToStudio(binFile) {
+      try {
+        const res = await fetch(`official_bins/${binFile}`);
+        const buf = await res.arrayBuffer();
+        const u8 = new Uint8Array(buf);
+        decompileBinToLayers(u8);
+        setTab('studio');
+      } catch (e) {
+        alert("Error descompilando la esfera: " + e.message);
+      }
+    }
+
+    function decompileBinToLayers(u8) {
+      const view = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+      const numItems = view.getUint16(46, true);
+      layers = [];
+
+      const items = [];
+      for (let i = 0; i < numItems; i++) {
+        const pos = 52 + i * 20;
+        const off = view.getUint32(pos, true);
+        const mode = u8[pos + 4];
+        const typ = u8[pos + 5];
+        const count = u8[pos + 6];
+        const fmt = u8[pos + 7];
+        const x = view.getUint16(pos + 8, true);
+        const y = view.getUint16(pos + 10, true);
+        items.push({ index: i, off, mode, typ, count, fmt, x, y });
+      }
+
+      const allOffs = Array.from(new Set(items.map(it => it.off).concat([u8.byteLength]))).sort((a,b) => a-b);
+      const offToSz = {};
+      for (let k = 0; k < allOffs.length - 1; k++) {
+        offToSz[allOffs[k]] = allOffs[k+1] - allOffs[k];
+      }
+
+      items.forEach(it => {
+        const sz = offToSz[it.off] || 0;
+        const chunk = u8.subarray(it.off, it.off + sz);
+        if (chunk[0] === 0x50 && chunk[1] === 0x41) {
+          const offCanvas = document.createElement('canvas');
+          const octx = offCanvas.getContext('2d');
+          const imgData = decodePAtoImageData(chunk, octx);
+          if (imgData) {
+            offCanvas.width = imgData.width;
+            offCanvas.height = imgData.height;
+            octx.putImageData(imgData, 0, 0);
+
+            const im = new Image();
+            im.src = offCanvas.toDataURL();
+            const l = {
+              id: 'layer_' + it.index,
+              name: `Capa 0x${it.typ.toString(16).toUpperCase()}`,
+              x: it.x, y: it.y, w: imgData.width, h: imgData.height,
+              img: im, count: it.count, visible: true
+            };
+            layers.push(l);
+          }
+        }
+      });
+
+      selectedLayerId = layers.length ? layers[0].id : null;
+      updateLayersListUI();
+      setTimeout(drawCanvas, 100);
+    }
+
+    // ==================== PESTAÑAS Y LIENZO ====================
+    let currentTab = 'device';
+    let layers = [];
+    let selectedLayerId = null;
+    const canvas = document.getElementById('theme-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function setTab(tab) {
+      currentTab = tab;
+      ['device', 'gallery', 'studio'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+        document.getElementById(`btn-tab-${t}`).className = (t === tab)
+          ? 'px-4 py-1.5 rounded-lg text-sm font-medium transition bg-blue-600 text-white shadow'
+          : 'px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white';
+      });
+      if (tab === 'gallery') renderOfficialGallery();
+      if (tab === 'studio') drawCanvas();
+    }
+
+    function drawCanvas() {
+      ctx.clearRect(0, 0, 320, 172);
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, 320, 172);
+
+      layers.forEach(l => {
+        if (!l.visible || !l.img) return;
+        ctx.drawImage(l.img, Math.floor(l.x - l.w / 2), Math.floor(l.y - l.h / 2));
+        if (l.id === selectedLayerId) {
+          ctx.strokeStyle = "#3b82f6";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(Math.floor(l.x - l.w / 2) - 1, Math.floor(l.y - l.h / 2) - 1, l.w + 2, l.h + 2);
+        }
+      });
+    }
+
+    function handleImageUpload(e, kind) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const im = new Image();
+        im.onload = () => {
+          const l = {
+            id: 'layer_' + Date.now(),
+            name: (kind === 'background') ? 'Fondo (320×172)' : 'Personaje PNG',
+            x: 160, y: 86, w: im.width, h: im.height,
+            img: im, visible: true
+          };
+          if (kind === 'background') layers.unshift(l);
+          else layers.push(l);
+          selectedLayerId = l.id;
+          updateLayersListUI();
+          drawCanvas();
+        };
+        im.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function addClockWidget() {
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = 160; offCanvas.height = 54;
+      const octx = offCanvas.getContext('2d');
+      octx.font = "bold 48px sans-serif";
+      octx.fillStyle = "#FFFFFF";
+      octx.strokeStyle = "#000000";
+      octx.lineWidth = 3;
+      octx.strokeText("09:28", 10, 44);
+      octx.fillText("09:28", 10, 44);
+
+      const im = new Image();
+      im.onload = () => {
+        const l = { id: 'layer_clock_' + Date.now(), name: 'Reloj Digital', x: 160, y: 110, w: 160, h: 54, img: im, visible: true };
+        layers.push(l);
+        selectedLayerId = l.id;
+        updateLayersListUI();
+        drawCanvas();
+      };
+      im.src = offCanvas.toDataURL();
+    }
+
+    function addDateWidget() {
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = 140; offCanvas.height = 24;
+      const octx = offCanvas.getContext('2d');
+      octx.font = "bold 16px sans-serif";
+      octx.fillStyle = "#60A5FA";
+      octx.fillText("DOM 10/24", 10, 18);
+
+      const im = new Image();
+      im.onload = () => {
+        const l = { id: 'layer_date_' + Date.now(), name: 'Fecha (DOM 10/24)', x: 160, y: 40, w: 140, h: 24, img: im, visible: true };
+        layers.push(l);
+        selectedLayerId = l.id;
+        updateLayersListUI();
+        drawCanvas();
+      };
+      im.src = offCanvas.toDataURL();
+    }
+
+    function updateLayersListUI() {
+      const list = document.getElementById('layers-list');
+      list.innerHTML = '';
+      layers.slice().reverse().forEach(l => {
+        const item = document.createElement('div');
+        item.className = `p-2 rounded-lg border text-xs flex justify-between cursor-pointer ${l.id === selectedLayerId ? 'border-blue-500 bg-blue-950/40 text-white' : 'border-gray-800 bg-gray-800/40 text-gray-400'}`;
+        item.onclick = () => { selectedLayerId = l.id; updateLayersListUI(); drawCanvas(); };
+        item.innerHTML = `<span>${l.name}</span><span class="font-mono">(${l.x}, ${l.y})</span>`;
+        list.appendChild(item);
+      });
+    }
+
+    function updateSelectedCoord(axis, val) {
+      const l = layers.find(x => x.id === selectedLayerId);
+      if (l) { l[axis] = parseInt(val) || 0; drawCanvas(); updateLayersListUI(); }
+    }
+
+    function moveLayerUp() {
+      const i = layers.findIndex(x => x.id === selectedLayerId);
+      if (i !== -1 && i < layers.length - 1) {
+        const tmp = layers[i]; layers[i] = layers[i+1]; layers[i+1] = tmp;
+        updateLayersListUI(); drawCanvas();
+      }
+    }
+
+    function moveLayerDown() {
+      const i = layers.findIndex(x => x.id === selectedLayerId);
+      if (i > 0) {
+        const tmp = layers[i]; layers[i] = layers[i-1]; layers[i-1] = tmp;
+        updateLayersListUI(); drawCanvas();
+      }
+    }
+
+    function deleteLayer() {
+      layers = layers.filter(x => x.id !== selectedLayerId);
+      selectedLayerId = layers.length ? layers[layers.length - 1].id : null;
+      updateLayersListUI(); drawCanvas();
+    }
+
+    // Inicializar sliders de EQ
+    const freqLabels = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
+    const eqContainer = document.getElementById('eq-sliders-container');
+    freqLabels.forEach((label, idx) => {
+      const col = document.createElement('div');
+      col.className = 'flex flex-col items-center space-y-1';
+      col.innerHTML = `
+        <span class="text-[10px] text-gray-400">${label}</span>
+        <input type="range" min="-12" max="12" value="0" class="slider-vertical" id="eq-slider-${idx}">
+        <span class="text-[10px] font-mono text-gray-500" id="eq-val-${idx}">0</span>
+      `;
+      eqContainer.appendChild(col);
+      const sl = col.querySelector('input');
+      sl.addEventListener('input', (e) => {
+        col.querySelector(`#eq-val-${idx}`).innerText = e.target.value;
+      });
+    });
+
+    async function sendEqCommand() {
+      const bands = [];
+      for (let i = 0; i < 10; i++) {
+        bands.push(parseInt(document.getElementById(`eq-slider-${i}`).value || '0'));
+      }
+      const p = parseInt(document.getElementById('sel-eq-preset').value || '0');
+      const payload = new Uint8Array(12);
+      payload[0] = 10;
+      payload[1] = p;
+      for (let i = 0; i < 10; i++) payload[2 + i] = bands[i] & 0xFF;
+      await sendBleCommand(0x20, payload);
+    }
+  </script>
+</body>
+</html>

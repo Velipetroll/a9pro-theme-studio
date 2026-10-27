@@ -4,6 +4,7 @@
 > **Fecha de Actualización:** Octubre de 2026  
 > **Dispositivo Objetivo:** Caja de Carga Inteligente con Pantalla Táctil A9 Pro LCD (320×172 px) y Auriculares TWS  
 > **Plataforma de Control:** Linux (BlueZ / Raw L2CAP ATT Sockets) / Python 3.9+ / HTML5 Canvas Web Studio  
+> **Web Studio en Vivo (GitHub Pages):** [https://velipetroll.github.io/a9pro-theme-studio/](https://velipetroll.github.io/a9pro-theme-studio/)  
 
 ---
 

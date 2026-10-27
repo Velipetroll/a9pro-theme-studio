@@ -2,7 +2,8 @@
 
 Suite integral de ingeniería inversa, personalización de temas (esferas de reloj) y telemetría Bluetooth Low Energy (BLE) para la caja de carga inteligente **A9 Pro** (pantalla LCD 320×172 px) y auriculares inalámbricos compatibles con chips Jerry (JL).
 
-> 📖 **Para la especificación técnica profunda, arquitectura del SoC JieLi, ingeniería inversa del protocolo RCSP, formato binario y solución al RTC, consulta [DOCUMENTACION.md](DOCUMENTACION.md).**
+> 📖 **Para la especificación técnica profunda, arquitectura del SoC JieLi, ingeniería inversa del protocolo RCSP, formato binario y solución al RTC, consulta [DOCUMENTACION.md](DOCUMENTACION.md).**  
+> 🌐 **Web Studio en Vivo (GitHub Pages): [https://velipetroll.github.io/a9pro-theme-studio/](https://velipetroll.github.io/a9pro-theme-studio/)**
 
 ---
 

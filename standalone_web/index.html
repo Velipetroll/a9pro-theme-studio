@@ -36,8 +36,14 @@
       <button onclick="setTab('studio')" id="btn-tab-studio" class="px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white">🎨 Personalizador</button>
     </nav>
 
-    <!-- Conexión Web Bluetooth -->
+    <!-- Conexión Web Bluetooth & Enlaces -->
     <div class="flex items-center space-x-2">
+      <a href="https://github.com/Velipetroll/a9pro-theme-studio/blob/main/DOCUMENTACION.md" target="_blank" class="hidden sm:flex px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 transition items-center gap-1">
+        📖 Docs
+      </a>
+      <a href="https://github.com/Velipetroll/a9pro-theme-studio" target="_blank" class="hidden sm:flex px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 transition items-center gap-1">
+        ⭐ GitHub
+      </a>
       <button onclick="toggleWebBluetooth()" id="btn-conn" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow transition flex items-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
         <span id="btn-conn-text">Conectar Bluetooth</span>
@@ -513,13 +519,21 @@
     }
 
     async function syncTimeToBox() {
-      const now = Math.floor(Date.now() / 1000);
-      const tzOffset = -Math.floor(new Date().getTimezoneOffset() / 60);
-      const buf = new Uint8Array(8);
-      buf[0] = (now >> 24) & 0xFF; buf[1] = (now >> 16) & 0xFF; buf[2] = (now >> 8) & 0xFF; buf[3] = now & 0xFF;
-      buf[4] = (tzOffset >> 24) & 0xFF; buf[5] = (tzOffset >> 16) & 0xFF; buf[6] = (tzOffset >> 8) & 0xFF; buf[7] = tzOffset & 0xFF;
+      // El firmware JieLi en la caja A9 Pro suma automáticamente +8 horas (CST / Beijing).
+      // Para que la caja muestre la hora local en cualquier zona horaria:
+      // target_ts = UTC - (8 - tzHours)
+      const tzHours = -(new Date().getTimezoneOffset() / 60);
+      const offsetSeconds = (8 - tzHours) * 3600;
+      const targetTs = Math.floor(Date.now() / 1000) - offsetSeconds;
+
+      const buf = new Uint8Array(4);
+      buf[0] = targetTs & 0xFF;
+      buf[1] = (targetTs >> 8) & 0xFF;
+      buf[2] = (targetTs >> 16) & 0xFF;
+      buf[3] = (targetTs >> 24) & 0xFF;
+
       await sendBleCommand(0x93, buf);
-      alert("¡Hora y fecha sincronizadas directamente con la A9 Pro Box!");
+      alert("¡Hora sincronizada con la caja A9 Pro! (Compensación de zona horaria aplicada). Si la pantalla no cambia de inmediato, apágala y préndela con el botón lateral para refrescar dígitos.");
     }
 
     // ==================== SUBIDA DE ESFERA DIRECTA POR WEB BLUETOOTH ====================
