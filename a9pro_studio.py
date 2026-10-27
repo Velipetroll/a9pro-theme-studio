@@ -10,6 +10,7 @@ A9 Pro Studio - Suite Completa para A9 Pro Box & Audífonos
 import sys
 import os
 import time
+import datetime
 import json
 import base64
 import io
@@ -294,16 +295,25 @@ class A9ProDeviceManager:
         mask = (1 if left else 0) | (2 if right else 0)
         return self.send_raw_command(0x37, bytes([mask]))
 
-    def sync_time(self, offset_hours: float = -13.0) -> bool:
-        # Compensación del desfase del RTC en el firmware JieLi:
-        # El firmware de la caja A9 Pro suma automáticamente +8h (Beijing / CST) a la marca de tiempo recibida.
-        # En Colombia/Perú (UTC-5), el desfase total respecto al reloj de la caja es de -13h (+8h - (-5h) = 13h).
-        # Aplicamos offset_hours (por defecto -13h) para sincronizar exactamente con la hora local.
-        target_ts = int(time.time() + (offset_hours * 3600))
+    def sync_time(self, offset_hours: float = -13.0, exact_datetime: Optional[datetime.datetime] = None) -> bool:
+        if exact_datetime:
+            dt = exact_datetime
+        else:
+            dt = datetime.datetime.now()
+            if offset_hours != -13.0:
+                dt = dt + datetime.timedelta(hours=(offset_hours + 13.0))
+
+        # El firmware de la caja JieLi suma automáticamente +8h (Beijing CST) al timestamp recibido.
+        # Para que el RTC muestre exactamente dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second:
+        target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
+        target_ts = int(target_dt.timestamp()) - 8 * 3600
         payload = struct.pack("<I", target_ts)
-        local_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        print(f"[DeviceManager] Sincronizando hora con Unix timestamp: {target_ts} (offset: {offset_hours:+.1f}h, hora local: {local_str}) via ATT Write Req (0x12)...")
+        local_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[DeviceManager] Sincronizando RTC caja a fecha/hora: {local_str} (ts: {target_ts}) via ATT...")
         ok = self.send_raw_command(0x93, payload, use_req=True)
+        if not ok:
+            print("[DeviceManager] Fallback enviando via ATT Write Command (0x52)...")
+            ok = self.send_raw_command(0x93, payload, use_req=False)
         print(f"[DeviceManager] Sincronización de hora: {'EXITOSA' if ok else 'FALLIDA'}")
         return ok
 
@@ -1051,9 +1061,18 @@ class StudioHTTPHandler(BaseHTTPRequestHandler):
             ok = device_mgr.find_earbuds(left, right)
             self._send_json({"success": ok})
         elif path == "/api/control/sync_time":
+            manual_date = req.get("manual_date")
+            manual_time = req.get("manual_time")
+            exact_dt = None
+            if manual_date and manual_time:
+                try:
+                    exact_dt = datetime.datetime.strptime(f"{manual_date} {manual_time}", "%Y-%m-%d %H:%M")
+                except Exception:
+                    pass
             offset_hours = float(req.get("offset_hours", -13.0))
-            ok = device_mgr.sync_time(offset_hours=offset_hours)
-            self._send_json({"success": ok, "offset_hours": offset_hours})
+            ok = device_mgr.sync_time(offset_hours=offset_hours, exact_datetime=exact_dt)
+            curr_str = (exact_dt or datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+            self._send_json({"success": ok, "offset_hours": offset_hours, "synced_time": curr_str})
         elif path == "/api/themes/render_strip":
             strip_type = req.get("strip_type", "digits")
             font_size = req.get("font_size", 50)
@@ -1345,35 +1364,45 @@ def get_studio_ui_html() -> str:
         </div>
       </div>
 
-      <!-- Barra de Acciones Rápidas -->
-        <div class="flex flex-wrap items-center gap-3">
-          <button onclick="requestBattery()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-lg shadow transition flex items-center gap-2">
-            🔄 Solicitar Batería e Info Ahora
-          </button>
-          <div class="flex items-center bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 gap-2">
-            <span class="text-xs text-gray-300">Ajuste RTC:</span>
-            <select id="sel-time-offset" class="bg-gray-900 text-xs text-amber-400 font-semibold px-2 py-1 rounded border border-gray-700 focus:outline-none">
-              <option value="-13" selected>-13h (Colombia / UTC-5 Exacta)</option>
-              <option value="-14">-14h (UTC-6)</option>
-              <option value="-12">-12h (UTC-4)</option>
-              <option value="-11">-11h (UTC-3)</option>
-              <option value="-15">-15h</option>
-              <option value="-10">-10h</option>
-              <option value="-8">-8h (CST compensado)</option>
-              <option value="0">0h (UTC puro / China)</option>
-            </select>
-            <button onclick="syncTime()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-semibold rounded shadow transition flex items-center gap-1.5">
-              🕒 Sincronizar Reloj Caja
+      <!-- Barra de Acciones y Sincronización Horaria -->
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <button onclick="requestBattery()" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg shadow transition flex items-center gap-1.5">
+              🔄 Consultar Batería
+            </button>
+            <button onclick="syncTimeAuto()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5">
+              🕒 Sincronizar Hora con mi PC (Auto)
             </button>
           </div>
+          <div class="flex items-center space-x-2 text-xs text-gray-400">
+            <span>MAC: <b id="txt-mac" class="font-mono text-gray-200">41:42:6C:C2:DD:3C</b></span>
+            <span>|</span>
+            <span>Resolución: <b class="text-gray-200">320×172 px</b></span>
+            <span>|</span>
+            <span>Límite: <b class="text-gray-200">150 KB</b></span>
+          </div>
         </div>
-        <div class="flex items-center space-x-2 text-xs text-gray-400">
-          <span>MAC: <b id="txt-mac" class="font-mono text-gray-200">41:42:6C:C2:DD:3C</b></span>
-          <span>|</span>
-          <span>Resolución: <b class="text-gray-200">320×172 px</b></span>
-          <span>|</span>
-          <span>Límite Esfera: <b class="text-gray-200">150 KB</b></span>
+
+        <!-- Ajuste Manual de Fecha y Hora -->
+        <div class="pt-2 border-t border-gray-800 flex flex-wrap items-center gap-3 text-xs">
+          <span class="text-gray-400 font-medium flex items-center gap-1">⏱️ Ajuste Manual:</span>
+          <input type="date" id="inp-sync-date" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1 text-xs focus:outline-none">
+          <input type="time" id="inp-sync-time" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1 text-xs focus:outline-none">
+          <select id="sel-time-offset" class="bg-gray-800 border border-gray-700 text-amber-400 font-semibold px-2 py-1 rounded text-xs focus:outline-none">
+            <option value="-13" selected>Offset -13h (Colombia / UTC-5)</option>
+            <option value="-14">Offset -14h (UTC-6)</option>
+            <option value="-12">Offset -12h (UTC-4)</option>
+            <option value="0">Offset 0h (UTC Puro)</option>
+          </select>
+          <button onclick="syncTimeManual()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-semibold rounded text-xs shadow transition">
+            Enviar Fecha y Hora Elegida
+          </button>
         </div>
+
+        <p class="text-[11px] text-gray-400 flex items-center gap-1">
+          💡 <span><b>Tip:</b> Tras enviar la hora, si la pantalla de la caja no cambia al segundo: apaga y enciende la pantalla con el botón lateral o desliza entre pantallas para que se refresquen los dígitos.</span>
+        </p>
       </div>
 
       <!-- Fila de Controles Oficiales (ANC, Modos, Ecualizador) -->
@@ -2043,25 +2072,61 @@ def get_studio_ui_html() -> str:
       updateStatus();
     }
 
-    async function syncTime() {
-      const sel = document.getElementById('sel-time-offset');
-      const offset = sel ? parseFloat(sel.value) : -13.0;
+    async function syncTimeAuto() {
       try {
         const res = await fetch('/api/control/sync_time', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ offset_hours: offset })
+          body: JSON.stringify({ offset_hours: -13.0 })
         });
         const data = await res.json();
         if (data.success) {
-          showToast("Reloj Sincronizado", `Hora local enviada (ajuste: ${offset}h). Si la pantalla no cambia al instante, apágala y préndela o desliza entre pantallas para refrescar dígitos. 🕒`, "🕒", true);
+          showToast("Reloj Sincronizado", `Hora local de tu PC enviada: ${data.synced_time}. Apaga y enciende la pantalla de la caja para refrescar. 🕒`, "🕒", true);
         } else {
-          alert("No se pudo sincronizar el reloj. Asegúrate de encender la pantalla de la caja para que el Bluetooth responda.");
+          alert("No se pudo sincronizar el reloj. Enciende la pantalla de la caja para que el Bluetooth responda.");
         }
       } catch (e) {
         alert("Error de conexión al sincronizar: " + e.message);
       }
     }
+
+    async function syncTimeManual() {
+      const inpDate = document.getElementById('inp-sync-date');
+      const inpTime = document.getElementById('inp-sync-time');
+      const sel = document.getElementById('sel-time-offset');
+      const offset = sel ? parseFloat(sel.value) : -13.0;
+
+      let dateVal = inpDate ? inpDate.value : '';
+      let timeVal = inpTime ? inpTime.value : '';
+
+      if (!dateVal || !timeVal) {
+        const now = new Date();
+        if (!dateVal) dateVal = now.toISOString().split('T')[0];
+        if (!timeVal) timeVal = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      }
+
+      try {
+        const res = await fetch('/api/control/sync_time', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            manual_date: dateVal,
+            manual_time: timeVal,
+            offset_hours: offset
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast("Fecha y Hora Enviada", `Hora fijada a: ${data.synced_time}. Apaga y enciende la pantalla de la caja para ver los nuevos dígitos. 🕒`, "🕒", true);
+        } else {
+          alert("No se pudo sincronizar el reloj. Enciende la pantalla de la caja para que el Bluetooth responda.");
+        }
+      } catch (e) {
+        alert("Error al sincronizar: " + e.message);
+      }
+    }
+
+    const syncTime = syncTimeAuto;
 
     async function setNoiseMode(m) {
       await fetch('/api/control/noise', { method: 'POST', body: JSON.stringify({ mode: m }) });
@@ -3421,6 +3486,15 @@ def get_studio_ui_html() -> str:
       // Si no hay tema previo persistido, cargar la esfera oficial por defecto
       loadOfficialToStudio('385_deb0daf817f94b5d8e1fb4a0ff4bd7f3', false);
     }
+
+    function initSyncInputs() {
+      const inpDate = document.getElementById('inp-sync-date');
+      const inpTime = document.getElementById('inp-sync-time');
+      const now = new Date();
+      if (inpDate) inpDate.value = now.toISOString().split('T')[0];
+      if (inpTime) inpTime.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    }
+    initSyncInputs();
 
     setTimeout(initThemeOnStartup, 150);
 
