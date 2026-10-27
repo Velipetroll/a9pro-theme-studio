@@ -236,7 +236,7 @@ def _encode_pa_row(pixels_rgba: List[Tuple[int, int, int, int]], has_alpha: bool
     """
     conv = []
     for r, g, b, a in pixels_rgba:
-        if has_alpha and a == 0:
+        if has_alpha and a <= 4:
             conv.append((0, 0))
         else:
             c565 = rgb888_to_rgb565(r, g, b)

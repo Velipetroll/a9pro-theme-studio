@@ -877,7 +877,28 @@ class ThemeStudioEngine:
         for l in active_layers:
             img_b64 = l["image_data"].split(",", 1)[-1]
             im = Image.open(io.BytesIO(base64.b64decode(img_b64)))
-            has_alpha = l.get("has_alpha", True)
+
+            # Auto-detección rigurosa de canal y píxeles de transparencia:
+            # Si la capa contiene píxeles con transparencia o semitransparencia (alpha < 250),
+            # DEBE codificarse obligatoriamente con has_alpha=True para que el hardware
+            # del reloj no renderice un fondo negro sólido alrededor de la imagen.
+            # Si la imagen es 100% opaca, se codifica con has_alpha=False para ahorrar espacio y CPU.
+            has_alpha = bool(l.get("has_alpha", True))
+            if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+                im_rgba = im.convert("RGBA")
+                alpha_ch = im_rgba.split()[-1]
+                min_a, _ = alpha_ch.getextrema()
+                if min_a < 250:
+                    has_alpha = True
+                    # Limpiar ruido de borde casi invisible de remuestreo Lanczos (alpha < 6)
+                    if min_a < 6:
+                        r, g, b, a = im_rgba.split()
+                        a = a.point(lambda p: 0 if p < 6 else p)
+                        im = Image.merge("RGBA", (r, g, b, a))
+                else:
+                    has_alpha = False
+            elif not has_alpha:
+                has_alpha = False
 
             # Clave única
             raw_key = hashlib.md5(im.tobytes() + bytes([1 if has_alpha else 0])).hexdigest()
@@ -1681,6 +1702,12 @@ def get_studio_ui_html() -> str:
                 <span id="txt-fullscreen-status" class="font-bold text-gray-400">OFF</span>
               </button>
 
+              <!-- Conmutador de Transparencia (Fondo transparente / Alpha) -->
+              <button id="btn-toggle-alpha" onclick="toggleLayerAlpha()" class="w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition" title="Activa o desactiva la transparencia (canal Alpha) para evitar fondos negros">
+                <span>✨ Fondo Transparente:</span>
+                <span id="txt-alpha-status" class="font-bold text-gray-400">OFF</span>
+              </button>
+
               <!-- Reductor de Resolución (Slider interactivo: reduce peso en KB manteniendo escala en pantalla) -->
               <div class="space-y-1">
                 <div class="flex justify-between items-center text-[11px]">
@@ -2385,6 +2412,21 @@ def get_studio_ui_html() -> str:
         }
       }
 
+      // Indicador y botón de Transparencia (Alpha)
+      const alphaBtn = document.getElementById('btn-toggle-alpha');
+      const alphaTxt = document.getElementById('txt-alpha-status');
+      if (alphaBtn && alphaTxt) {
+        if (l.has_alpha) {
+          alphaBtn.className = 'w-full p-1.5 bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/50 transition';
+          alphaTxt.innerText = 'ON (Transparente)';
+          alphaTxt.className = 'font-extrabold text-emerald-100';
+        } else {
+          alphaBtn.className = 'w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition';
+          alphaTxt.innerText = 'OFF (Opaco)';
+          alphaTxt.className = 'font-bold text-gray-400';
+        }
+      }
+
       const resInfo = document.getElementById('txt-res-pct-info');
       if (resInfo) {
         const cnt = l.count || 1;
@@ -2594,6 +2636,15 @@ def get_studio_ui_html() -> str:
       await applyLayerProcessing(l);
     }
 
+    // Alternar canal de transparencia (Alpha) de la capa
+    function toggleLayerAlpha() {
+      const l = project.layers.find(x => x.id === selectedLayerId);
+      if (!l) return alert('Selecciona una imagen o capa primero.');
+      l.has_alpha = !l.has_alpha;
+      selectLayer(l.id);
+      drawCanvas();
+    }
+
     // 2. Modificar tamaño manual (ancho o alto) conservando resolución y compresión activas
     async function updateSelectedSize(dimension, val) {
       const l = project.layers.find(x => x.id === selectedLayerId);
@@ -2767,16 +2818,35 @@ def get_studio_ui_html() -> str:
 
           const im = new Image();
           im.onload = () => {
+            // Analizar si la imagen contiene píxeles con transparencia real
+            let imgHasAlpha = false;
+            try {
+              const testCanvas = document.createElement('canvas');
+              testCanvas.width = Math.min(im.width, 320);
+              testCanvas.height = Math.min(im.height, 172);
+              const tCtx = testCanvas.getContext('2d');
+              tCtx.drawImage(im, 0, 0, testCanvas.width, testCanvas.height);
+              const imgData = tCtx.getImageData(0, 0, testCanvas.width, testCanvas.height);
+              for (let idx = 3; idx < imgData.data.length; idx += 4) {
+                if (imgData.data[idx] < 250) {
+                  imgHasAlpha = true;
+                  break;
+                }
+              }
+            } catch (e) {
+              imgHasAlpha = (kind !== 'background');
+            }
+
             if (kind === 'background') {
-              // Fondo reemplaza o agrega al inicio (modo pantalla completa 320x172)
+              // Si la imagen tiene transparencia, no forzar modo fondo opaco
               const l = {
                 id: 'layer_bg_' + Date.now(),
-                name: 'Fondo Pantalla (320×172)',
+                name: imgHasAlpha ? 'Imagen PNG Transparente' : 'Fondo Pantalla (320×172)',
                 type: 0x10, mode: 2, count: 1, fmt: 1,
-                x: 160, y: 86, has_alpha: false,
-                fit_screen: true,
+                x: 160, y: 86, has_alpha: imgHasAlpha,
+                fit_screen: !imgHasAlpha,
                 width: im.width, height: im.height,
-                target_w: 320, target_h: 172,
+                target_w: imgHasAlpha ? im.width : 320, target_h: imgHasAlpha ? im.height : 172,
                 image_data: finalB64, _rawImgB64: finalB64,
                 res_pct: 100, max_colors: 256,
                 extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
