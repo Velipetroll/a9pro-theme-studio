@@ -782,8 +782,15 @@ class A9ProL2CAPClient:
             target_ts = int(time.time() + (offset_hours * 3600))
             payload = struct.pack("<I", target_ts)
             cmd_pkt = self.build_cmd(CMD_TIMESTAMP, payload)
-            ok = self.write_req(cmd_pkt)
+            # Enviar por handle 0x0008 (FF17) y 0x0006 (FF16)
+            ok1 = self.write_req(cmd_pkt, handle=0x0008)
+            ok2 = self.write_req(cmd_pkt, handle=0x0006)
+            self.write_cmd(cmd_pkt, handle=0x0008)
+            self.write_cmd(cmd_pkt, handle=0x0006)
+            # Enviar query 0x27 para forzar refresco del bucle de pantalla
+            self.write_cmd(self.build_cmd(CMD_DEVICE_INFO, bytes([0x01, 0x00])))
             local_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            ok = ok1 or ok2
             print(
                 f"[BLE] Hora sincronizada a: {local_str} (Unix ts: {target_ts}, offset: {offset_hours:+.1f}h, res: {'OK' if ok else 'FALLIDO'})"
             )

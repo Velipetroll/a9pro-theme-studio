@@ -298,22 +298,50 @@ class A9ProDeviceManager:
     def sync_time(self, offset_hours: float = -13.0, exact_datetime: Optional[datetime.datetime] = None) -> bool:
         if exact_datetime:
             dt = exact_datetime
+            if offset_hours == 0.0:
+                # Enviar timestamp directo sin restar 8 horas
+                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
+                target_ts = int(target_dt.timestamp())
+            else:
+                # Compensar los +8h de Beijing que suma el chip internamente
+                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
+                target_ts = int(target_dt.timestamp()) - 8 * 3600
         else:
             dt = datetime.datetime.now()
-            if offset_hours != -13.0:
-                dt = dt + datetime.timedelta(hours=(offset_hours + 13.0))
+            if offset_hours == 0.0:
+                target_ts = int(time.time())
+            elif offset_hours == -13.0:
+                # Colombia (UTC-5) -> Compensación Beijing (+8h): local_time - 8h
+                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
+                target_ts = int(target_dt.timestamp()) - 8 * 3600
+            else:
+                target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
+                target_ts = int(target_dt.timestamp()) + int(offset_hours * 3600)
 
-        # El firmware de la caja JieLi suma automáticamente +8h (Beijing CST) al timestamp recibido.
-        # Para que el RTC muestre exactamente dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second:
-        target_dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=datetime.timezone.utc)
-        target_ts = int(target_dt.timestamp()) - 8 * 3600
         payload = struct.pack("<I", target_ts)
         local_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[DeviceManager] Sincronizando RTC caja a fecha/hora: {local_str} (ts: {target_ts}) via ATT...")
-        ok = self.send_raw_command(0x93, payload, use_req=True)
-        if not ok:
-            print("[DeviceManager] Fallback enviando via ATT Write Command (0x52)...")
-            ok = self.send_raw_command(0x93, payload, use_req=False)
+        print(f"[DeviceManager] Sincronizando RTC caja a fecha/hora: {local_str} (ts: {target_ts}, offset: {offset_hours:+.1f}h)...")
+
+        with self.lock:
+            if not self.connected or not self.client:
+                if not self.connect():
+                    return False
+            try:
+                pkt = self.client.build_cmd(0x93, payload)
+                # 1. Enviar a Handle 0x0008 (FF17 - TX canal de comandos principal)
+                ok1 = self.client.write_req(pkt, handle=0x0008)
+                # 2. Enviar a Handle 0x0006 (FF16 - TX canal de respuestas/datos)
+                ok2 = self.client.write_req(pkt, handle=0x0006)
+                # 3. Fallback unacknowledged write_cmd en ambos canales
+                self.client.write_cmd(pkt, handle=0x0008)
+                self.client.write_cmd(pkt, handle=0x0006)
+                # 4. Enviar consulta de estado 0x27 para despertar el bucle de renderizado UI del firmware
+                self.client.write_cmd(self.client.build_cmd(0x27, bytes([0x01, 0x00])))
+                ok = ok1 or ok2
+            except Exception as e:
+                print(f"[DeviceManager] Error enviando comando 0x93: {e}")
+                ok = False
+
         print(f"[DeviceManager] Sincronización de hora: {'EXITOSA' if ok else 'FALLIDA'}")
         return ok
 
