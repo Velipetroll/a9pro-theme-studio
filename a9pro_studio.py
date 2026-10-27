@@ -538,7 +538,7 @@ class ThemeStudioEngine:
 
     @staticmethod
     def _resample_internal_resolution(img: Image.Image, res_pct: int = 100,
-                                     base_w: Optional[int] = None, base_h: Optional[int] = None) -> Image.Image:
+                                     resample_filter: int = Image.Resampling.NEAREST) -> Image.Image:
         """
         Reduce la resolución real de la imagen/fotograma en porcentaje,
         disminuyendo drásticamente el tamaño del archivo binario y de la tira de sprites.
@@ -548,7 +548,7 @@ class ThemeStudioEngine:
         curr_w, curr_h = img.size
         new_w = max(16, int(round(curr_w * res_pct / 100.0)))
         new_h = max(16, int(round(curr_h * res_pct / 100.0)))
-        return img.resize((new_w, new_h), Image.Resampling.NEAREST)
+        return img.resize((new_w, new_h), resample_filter)
 
     @staticmethod
     def convert_gif_to_strip(gif_bytes: bytes, max_frames: int = 8, fit_screen: bool = False,
@@ -612,6 +612,11 @@ class ThemeStudioEngine:
         # Extraer resolución nativa del video original
         base_w, base_h = raw_frames[0].size
 
+        # Si el ancho original supera los 320 px de la pantalla, auto-reescalar proporcionalmente a 320 px
+        if not fit_screen and base_w > 320:
+            target_w = 320
+            target_h = max(1, int(round(base_h * 320.0 / base_w)))
+
         frames = []
         for frame in raw_frames:
             if fit_screen:
@@ -619,11 +624,18 @@ class ThemeStudioEngine:
                 from PIL import ImageOps
                 frame = ImageOps.fit(frame, (320, 172), method=Image.Resampling.NEAREST, centering=(0.5, 0.5))
             elif target_w and target_h:
+                if target_w > 320:
+                    target_h = max(1, int(round(target_h * 320.0 / target_w)))
+                    target_w = 320
                 frame = frame.resize((target_w, target_h), Image.Resampling.NEAREST)
+            elif frame.width > 320:
+                nh = max(1, int(round(frame.height * 320.0 / frame.width)))
+                frame = frame.resize((320, nh), Image.Resampling.NEAREST)
 
             # Reducir resolución real en porcentaje (mantiene la escala en pantalla pero reduce drásticamente el tamaño .bin)
+            # Para GIFs se usa NEAREST para no perder nitidez en pixel art y bordes
             if res_pct < 100:
-                frame = ThemeStudioEngine._resample_internal_resolution(frame, res_pct=res_pct)
+                frame = ThemeStudioEngine._resample_internal_resolution(frame, res_pct=res_pct, resample_filter=Image.Resampling.NEAREST)
 
             # Comprimir información de imagen (cuantización de paleta)
             if max_colors < 256:
@@ -639,31 +651,47 @@ class ThemeStudioEngine:
         buf = io.BytesIO()
         strip.save(buf, format="PNG")
         b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
-        return b64, len(frames), adjusted_frame_duration_ms, total_available, total_video_duration_ms, base_w, base_h
+        return b64, len(frames), adjusted_frame_duration_ms, total_available, total_video_duration_ms, fw, fh
 
     @staticmethod
     def optimize_image(img_bytes: bytes, target_w: Optional[int] = None, target_h: Optional[int] = None,
                        mode: str = "fit_exact", max_colors: int = 64, res_pct: int = 100) -> str:
-        """Comprime la información de la imagen ajustando resolución interna en porcentaje atado a la resolución original."""
+        """Comprime la información de la imagen ajustando resolución interna en porcentaje y aplicando filtrado de alta calidad (Lanczos)."""
         im = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         base_w, base_h = im.size
+
+        # Si el ancho original supera los 320 px de la pantalla, auto-reescalar proporcionalmente a 320 px
+        if base_w > 320 and mode != "cover":
+            new_w = 320
+            new_h = max(1, int(round(base_h * 320.0 / base_w)))
+            im = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            if target_w and target_w > 320:
+                target_w = 320
+                target_h = new_h
+
         if target_w and target_h:
+            if target_w > 320 and mode != "cover":
+                target_h = max(1, int(round(target_h * 320.0 / target_w)))
+                target_w = 320
             if mode == "cover":
                 from PIL import ImageOps
-                im = ImageOps.fit(im, (target_w, target_h), method=Image.Resampling.NEAREST, centering=(0.5, 0.5))
+                im = ImageOps.fit(im, (target_w, target_h), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
             elif mode == "fit_exact":
-                im = im.resize((target_w, target_h), Image.Resampling.NEAREST)
+                im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
             elif mode == "contain":
                 resized = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-                im.thumbnail((target_w, target_h), Image.Resampling.NEAREST)
+                im.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
                 rx = (target_w - im.width) // 2
                 ry = (target_h - im.height) // 2
                 resized.paste(im, (rx, ry))
                 im = resized
+        elif im.width > 320:
+            new_h = max(1, int(round(im.height * 320.0 / im.width)))
+            im = im.resize((320, new_h), Image.Resampling.LANCZOS)
 
-        # Reducir resolución real en porcentaje (reduce drásticamente el tamaño .bin conservando escala)
+        # Reducir resolución real en porcentaje con filtrado suave Lanczos
         if res_pct < 100:
-            im = ThemeStudioEngine._resample_internal_resolution(im, res_pct=res_pct)
+            im = ThemeStudioEngine._resample_internal_resolution(im, res_pct=res_pct, resample_filter=Image.Resampling.LANCZOS)
 
         # Comprimir información de color reduciendo entropía para el algoritmo RLE de la caja
         if max_colors < 256:
@@ -753,23 +781,36 @@ class ThemeStudioEngine:
                 cnt = l.get("count", 1)
                 l_copy = dict(l)
 
+                orig_fw = im.width // cnt if cnt > 0 else im.width
+                orig_fh = im.height
+                is_gif = (l.get("type") == 0x13)
+                filt = Image.Resampling.NEAREST if is_gif else Image.Resampling.LANCZOS
+
                 # Si la capa tiene activada la opción de pantalla completa (fit_screen):
-                # Reescalar cada frame exactamente a 320x172 usando NEAREST (mantiene los píxeles nítidos
-                # y comprime de forma óptima con el algoritmo RLE/PA del hardware).
                 if l.get("fit_screen"):
-                    orig_fw = im.width // cnt if cnt > 0 else im.width
-                    orig_fh = im.height
                     if (orig_fw, orig_fh) != (320, 172):
                         scaled_strip = Image.new("RGBA", (320 * cnt, 172), (0, 0, 0, 0))
                         for i in range(cnt):
                             frame = im.crop((i * orig_fw, 0, (i + 1) * orig_fw, orig_fh))
-                            frame_scaled = frame.resize((320, 172), Image.Resampling.NEAREST)
+                            frame_scaled = frame.resize((320, 172), filt)
                             scaled_strip.paste(frame_scaled, (i * 320, 0))
                         im = scaled_strip
                     l_copy["x"] = 160
                     l_copy["y"] = 86
                     l_copy["target_w"] = 320
                     l_copy["target_h"] = 172
+                elif orig_fw > 320:
+                    # Auto-reescalar si el ancho supera los 320px de la pantalla
+                    new_fw = 320
+                    new_fh = max(1, int(round(orig_fh * 320.0 / orig_fw)))
+                    scaled_strip = Image.new("RGBA", (new_fw * cnt, new_fh), (0, 0, 0, 0))
+                    for i in range(cnt):
+                        frame = im.crop((i * orig_fw, 0, (i + 1) * orig_fw, orig_fh))
+                        frame_scaled = frame.resize((new_fw, new_fh), filt)
+                        scaled_strip.paste(frame_scaled, (i * new_fw, 0))
+                    im = scaled_strip
+                    l_copy["target_w"] = new_fw
+                    l_copy["target_h"] = new_fh
 
                 crop_res = ThemeStudioEngine.crop_layer_to_viewport(
                     im,
@@ -1618,24 +1659,7 @@ def get_studio_ui_html() -> str:
                 </div>
               </div>
               
-              <!-- Botones de Escala Rápida -->
-              <div class="flex items-center justify-between gap-1 pt-1">
-                <span class="text-[10px] text-gray-500 uppercase">Escala:</span>
-                <div class="flex items-center gap-1">
-                  <button onclick="scaleSelectedLayer(0.8)" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-300 transition" title="Reducir tamaño un 20%">
-                    🔍 -20%
-                  </button>
-                  <button onclick="scaleSelectedLayer(0.9)" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-300 transition" title="Reducir tamaño un 10%">
-                    -10%
-                  </button>
-                  <button onclick="scaleSelectedLayer(1.1)" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-300 transition" title="Aumentar tamaño un 10%">
-                    +10%
-                  </button>
-                  <button onclick="scaleSelectedLayer(1.2)" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-300 transition" title="Aumentar tamaño un 20%">
-                    🔍 +20%
-                  </button>
-                </div>
-              </div>
+
             </div>
 
             <!-- Botones de alineación rápida -->
@@ -1667,28 +1691,19 @@ def get_studio_ui_html() -> str:
                 <span id="txt-fullscreen-status" class="font-bold text-gray-400">OFF</span>
               </button>
 
-              <!-- Reductor de Resolución (Reduce peso en KB manteniendo la escala en pantalla) -->
+              <!-- Reductor de Resolución (Slider interactivo: reduce peso en KB manteniendo escala en pantalla) -->
               <div class="space-y-1">
                 <div class="flex justify-between items-center text-[11px]">
-                  <span class="text-gray-400 font-semibold" title="Reduce la resolución real de la imagen/GIF para bajar drásticamente el peso del archivo .bin conservando su tamaño en pantalla">📉 Reducir Resolución (Ahorro KB):</span>
-                  <span id="txt-res-pct-info" class="text-cyan-400 font-mono text-[10px]">100%</span>
+                  <span class="text-gray-400 font-semibold" title="Reduce la resolución real interna de la imagen/GIF para bajar drásticamente el peso del archivo .bin conservando su tamaño en pantalla">📉 Reducir Resolución (Ahorro KB):</span>
+                  <span id="txt-res-pct-info" class="text-cyan-400 font-mono text-[10px] font-bold">100%</span>
                 </div>
-                <div class="grid grid-cols-5 gap-1 text-[11px]">
-                  <button id="btn-res-100" onclick="compressInternalResolution(100)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="100%: Resolución nativa completa">
-                    100%
-                  </button>
-                  <button id="btn-res-75" onclick="compressInternalResolution(75)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="75%: Alta resolución (~35% ahorro KB)">
-                    75%
-                  </button>
-                  <button id="btn-res-50" onclick="compressInternalResolution(50)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="50%: Resolución balanceada (~60% ahorro KB)">
-                    50%
-                  </button>
-                  <button id="btn-res-35" onclick="compressInternalResolution(35)" class="p-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 rounded font-semibold text-amber-200 transition" title="35%: Compresión fuerte (~78% ahorro KB)">
-                    35%
-                  </button>
-                  <button id="btn-res-25" onclick="compressInternalResolution(25)" class="p-1.5 bg-red-950/60 hover:bg-red-900 border border-red-700/60 rounded font-semibold text-red-200 transition" title="25%: Compresión extrema (~88% ahorro KB)">
-                    25%
-                  </button>
+                <div class="flex items-center gap-2 pt-1">
+                  <span class="text-[10px] text-gray-500 font-mono">10%</span>
+                  <input type="range" id="sl-res-pct" min="10" max="100" step="5" value="100"
+                         class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                         oninput="onResolutionSliderInput(this.value)"
+                         onchange="onResolutionSliderChange(this.value)">
+                  <span class="text-[10px] text-gray-500 font-mono">100%</span>
                 </div>
               </div>
 
@@ -2074,6 +2089,9 @@ def get_studio_ui_html() -> str:
         const img = layer._imgObj;
         if (!img || !img.complete) return;
 
+        // Filtrado suave para imágenes estáticas, nearest-neighbor para animaciones GIF
+        ctx.imageSmoothingEnabled = (layer.type !== 0x13);
+
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
         const fh = imHeight(layer);
@@ -2133,7 +2151,6 @@ def get_studio_ui_html() -> str:
       const boxCanvas = document.getElementById('box-screen-canvas');
       if (boxCanvas) {
         const bCtx = boxCanvas.getContext('2d');
-        bCtx.imageSmoothingEnabled = false;
         bCtx.clearRect(0, 0, 320, 172);
         bCtx.fillStyle = "#000000";
         bCtx.fillRect(0, 0, 320, 172);
@@ -2149,6 +2166,9 @@ def get_studio_ui_html() -> str:
           if (!layer.visible) return;
           const img = layer._imgObj;
           if (!img || !img.complete) return;
+
+          // Filtrado suave para imágenes estáticas, nearest-neighbor para animaciones GIF
+          bCtx.imageSmoothingEnabled = (layer.type !== 0x13);
 
           const cnt = layer.count || 1;
           const fw = Math.floor(imWidth(layer) / cnt);
@@ -2354,25 +2374,12 @@ def get_studio_ui_html() -> str:
         }
       }
 
-      // Indicador de resolución real de imagen
+      // Slider de resolución interna de imagen
       const curRes = l.res_pct || 100;
-      const resBtns = [
-        { id: 'btn-res-100', pct: 100 },
-        { id: 'btn-res-75', pct: 75 },
-        { id: 'btn-res-50', pct: 50 },
-        { id: 'btn-res-35', pct: 35 },
-        { id: 'btn-res-25', pct: 25 }
-      ];
-      resBtns.forEach(b => {
-        const el = document.getElementById(b.id);
-        if (!el) return;
-        const isActive = (curRes === b.pct);
-        if (isActive) {
-          el.className = 'p-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
-        } else {
-          el.className = 'p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition';
-        }
-      });
+      const slRes = document.getElementById('sl-res-pct');
+      if (slRes) {
+        slRes.value = curRes;
+      }
       // Indicador y botón de Pantalla Completa (320×172)
       const fsBtn = document.getElementById('btn-toggle-fullscreen');
       const fsTxt = document.getElementById('txt-fullscreen-status');
@@ -2475,8 +2482,14 @@ def get_studio_ui_html() -> str:
         l.x = 160;
         l.y = 86;
       }
-      const targetW = l.target_w || (Math.floor(l.width / cnt));
-      const targetH = l.target_h || l.height;
+      let targetW = l.target_w || (Math.floor(l.width / cnt));
+      let targetH = l.target_h || l.height;
+      if (!l.fit_screen && targetW > 320) {
+        targetH = Math.max(1, Math.round(targetH * (320 / targetW)));
+        targetW = 320;
+        l.target_w = targetW;
+        l.target_h = targetH;
+      }
 
       if (l.type === 0x13 && (l.raw_gif_b64 || l._rawGifB64)) {
         const rawGif = l.raw_gif_b64 || l._rawGifB64;
@@ -2592,22 +2605,31 @@ def get_studio_ui_html() -> str:
       await applyLayerProcessing(l);
     }
 
-    // 3. Escalar capa seleccionada (+/- %) conservando resolución y compresión activas
-    async function scaleSelectedLayer(factor) {
+    // Eventos del slider interactivo de resolución
+    function onResolutionSliderInput(val) {
+      const resInfo = document.getElementById('txt-res-pct-info');
       const l = project.layers.find(x => x.id === selectedLayerId);
-      if (!l) return alert('Selecciona una capa primero.');
-      l.fit_screen = false;
-      const cnt = l.count || 1;
-      const curW = l.target_w || Math.floor(imWidth(l) / cnt);
-      const curH = l.target_h || imHeight(l);
-
-      l.target_w = Math.max(16, Math.round(curW * factor));
-      l.target_h = Math.max(16, Math.round(curH * factor));
-      await applyLayerProcessing(l);
+      if (resInfo && l) {
+        const cnt = l.count || 1;
+        const baseW = l.target_w || (l.fit_screen ? 320 : Math.floor(imWidth(l) / cnt));
+        const baseH = l.target_h || (l.fit_screen ? 172 : imHeight(l));
+        const estW = Math.max(16, Math.round(baseW * parseInt(val) / 100));
+        const estH = Math.max(16, Math.round(baseH * parseInt(val) / 100));
+        resInfo.innerText = `${val}% (~${estW}×${estH} px)`;
+      } else if (resInfo) {
+        resInfo.innerText = `${val}%`;
+      }
     }
 
-    // 4. Bajar la resolución en porcentaje (Pixel Binning) acumulativo con colores y tamaño
-    async function compressInternalResolution(resPct = 60) {
+    async function onResolutionSliderChange(val) {
+      const pct = parseInt(val);
+      if (!isNaN(pct)) {
+        await compressInternalResolution(pct);
+      }
+    }
+
+    // 3. Bajar la resolución en porcentaje (Pixel Binning) acumulativo con colores y tamaño
+    async function compressInternalResolution(resPct = 100) {
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (!l) return alert('Selecciona una imagen o animación primero.');
       l.res_pct = resPct;
@@ -2717,47 +2739,64 @@ def get_studio_ui_html() -> str:
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (evt) => {
-        const b64 = evt.target.result;
-        const im = new Image();
-        im.onload = () => {
-          if (kind === 'background') {
-            // Fondo reemplaza o agrega al inicio
-            const l = {
-              id: 'layer_bg_' + Date.now(),
-              name: 'Fondo Pantalla (320×172)',
-              type: 0x10, mode: 2, count: 1, fmt: 1,
-              x: 160, y: 86, has_alpha: false,
-              width: im.width, height: im.height,
-              target_w: im.width, target_h: im.height,
-              image_data: b64, _rawImgB64: b64,
-              res_pct: 100, max_colors: 256,
-              extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
-            };
-            project.layers.unshift(l);
-            selectLayer(l.id);
-          } else {
-            // Personaje superpuesto (Efecto profundidad)
-            const l = {
-              id: 'layer_overlay_' + Date.now(),
-              name: 'Personaje PNG (Profundidad)',
-              type: 0x10, mode: 2, count: 1, fmt: 1,
-              x: 160, y: 86, has_alpha: true,
-              width: im.width, height: im.height,
-              target_w: im.width, target_h: im.height,
-              image_data: b64, _rawImgB64: b64,
-              res_pct: 100, max_colors: 256,
-              extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
-            };
-            project.layers.push(l);
-            selectLayer(l.id);
-          }
-          updateLayersListUI();
-          drawCanvas();
-        };
-        im.src = b64;
+      reader.onload = async (evt) => {
+        const rawB64 = evt.target.result;
+        try {
+          // Optimizar y reescalar en backend si el ancho supera 320 px (usando filtrado Lanczos suave)
+          const res = await fetch('/api/themes/optimize_image', {
+            method: 'POST',
+            body: JSON.stringify({
+              image_data: rawB64,
+              max_colors: 256,
+              res_pct: 100
+            })
+          });
+          const data = await res.json();
+          const finalB64 = data.success ? data.image_data : rawB64;
+
+          const im = new Image();
+          im.onload = () => {
+            if (kind === 'background') {
+              // Fondo reemplaza o agrega al inicio
+              const l = {
+                id: 'layer_bg_' + Date.now(),
+                name: 'Fondo Pantalla (320×172)',
+                type: 0x10, mode: 2, count: 1, fmt: 1,
+                x: 160, y: 86, has_alpha: false,
+                width: im.width, height: im.height,
+                target_w: im.width, target_h: im.height,
+                image_data: finalB64, _rawImgB64: finalB64,
+                res_pct: 100, max_colors: 256,
+                extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
+              };
+              project.layers.unshift(l);
+              selectLayer(l.id);
+            } else {
+              // Personaje superpuesto (Efecto profundidad)
+              const l = {
+                id: 'layer_overlay_' + Date.now(),
+                name: 'Personaje PNG (Profundidad)',
+                type: 0x10, mode: 2, count: 1, fmt: 1,
+                x: 160, y: 86, has_alpha: true,
+                width: im.width, height: im.height,
+                target_w: im.width, target_h: im.height,
+                image_data: finalB64, _rawImgB64: finalB64,
+                res_pct: 100, max_colors: 256,
+                extra: [0, 0, 0, 0, 0, 0, 0, 0], visible: true, _imgObj: im
+              };
+              project.layers.push(l);
+              selectLayer(l.id);
+            }
+            updateLayersListUI();
+            drawCanvas();
+          };
+          im.src = finalB64;
+        } catch (err) {
+          alert('Error cargando imagen: ' + err.message);
+        }
       };
       reader.readAsDataURL(file);
+      e.target.value = '';
     }
 
     // Carga y conversión de Animación GIF (type=0x13)
