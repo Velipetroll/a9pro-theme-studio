@@ -1196,8 +1196,8 @@ canvas.addEventListener('mousedown', (e) => {
     const cnt = l.count || 1;
     const fw = Math.floor(imWidth(l) / cnt);
     const fh = imHeight(l);
-    const dw = l.target_w || (l.fit_screen ? 320 : fw);
-    const dh = l.target_h || (l.fit_screen ? 172 : fh);
+    const dw = l.fit_screen ? 320 : fw;
+    const dh = l.fit_screen ? 172 : fh;
     const lx = l.fit_screen ? 160 : l.x;
     const ly = l.fit_screen ? 86 : l.y;
 
@@ -1255,8 +1255,8 @@ function drawCanvas() {
     const cnt = layer.count || 1;
     const fw = Math.floor(imWidth(layer) / cnt);
     const fh = imHeight(layer);
-    const dw = layer.fit_screen ? 320 : (layer.target_w || fw);
-    const dh = layer.fit_screen ? 172 : (layer.target_h || fh);
+    const dw = layer.fit_screen ? 320 : fw;
+    const dh = layer.fit_screen ? 172 : fh;
     const x = layer.fit_screen ? 160 : layer.x;
     const y = layer.fit_screen ? 86 : layer.y;
 

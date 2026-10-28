@@ -2106,8 +2106,8 @@ def get_studio_ui_html() -> str:
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
         const fh = imHeight(layer);
-        const dw = layer.fit_screen ? 320 : (layer.target_w || layer.orig_w || fw);
-        const dh = layer.fit_screen ? 172 : (layer.target_h || layer.orig_h || fh);
+        const dw = layer.fit_screen ? 320 : fw;
+        const dh = layer.fit_screen ? 172 : fh;
         const x = layer.fit_screen ? 160 : layer.x;
         const y = layer.fit_screen ? 86 : layer.y;
 
@@ -2630,8 +2630,8 @@ def get_studio_ui_html() -> str:
         l.y = 86;
       } else {
         const cnt = l.count || 1;
-        l.target_w = l.orig_video_w || l._origVideoW || Math.floor(imWidth(l) / cnt);
-        l.target_h = l.orig_video_h || l._origVideoH || imHeight(l);
+        l.target_w = l.orig_w || l.orig_video_w || l._origVideoW || Math.floor(imWidth(l) / cnt);
+        l.target_h = l.orig_h || l.orig_video_h || l._origVideoH || imHeight(l);
       }
       await applyLayerProcessing(l);
     }
@@ -2656,6 +2656,7 @@ def get_studio_ui_html() -> str:
       const resInfo = document.getElementById('txt-res-pct-info');
       const l = project.layers.find(x => x.id === selectedLayerId);
       if (resInfo && l) {
+        const cnt = l.count || 1;
         const baseW = l.fit_screen ? 320 : (l.orig_w || l.orig_video_w || l.target_w || Math.floor(imWidth(l) / cnt));
         const baseH = l.fit_screen ? 172 : (l.orig_h || l.orig_video_h || l.target_h || imHeight(l));
         const estW = Math.max(16, Math.round(baseW * parseInt(val) / 100));
@@ -2743,8 +2744,8 @@ def get_studio_ui_html() -> str:
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
         const fh = imHeight(l);
-        const dw = l.fit_screen ? 320 : (l.target_w || l.orig_w || fw);
-        const dh = l.fit_screen ? 172 : (l.target_h || l.orig_h || fh);
+        const dw = l.fit_screen ? 320 : fw;
+        const dh = l.fit_screen ? 172 : fh;
         const lx = l.fit_screen ? 160 : l.x;
         const ly = l.fit_screen ? 86 : l.y;
         if (mx >= lx - dw / 2 && mx <= lx + dw / 2 && my >= ly - dh / 2 && my <= ly + dh / 2) {
