@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-cd "/home/varzonelp/.gemini/antigravity/scratch/a9pro_themes"
+cd "$(dirname "$0")"
 echo "========================================================="
 echo "  Iniciando A9 Pro Studio..."
 echo "  Abriendo en http://localhost:8765"

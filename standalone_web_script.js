@@ -43,8 +43,8 @@ function setTab(tab) {
     if (el) el.classList.toggle('hidden', t !== tab);
     if (btn) {
       btn.className = (t === tab)
-        ? 'px-4 py-1.5 rounded-lg text-sm font-medium transition bg-blue-600 text-white shadow'
-        : 'px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white';
+        ? 'px-3.5 py-1 rounded text-xs font-mono font-semibold transition bg-[#1f8fff] text-white shadow-sm flex items-center gap-1.5'
+        : 'px-3.5 py-1 rounded text-xs font-mono font-medium transition text-[#7f889b] hover:text-white flex items-center gap-1.5';
     }
   });
   if (tab === 'studio') {
@@ -57,7 +57,7 @@ function setTab(tab) {
 }
 
 // ==================== NOTIFICACIONES TOAST ====================
-function showToast(title, msg, icon = '⚡', isGreen = true) {
+function showToast(title, msg, icon = 'OK', isGreen = true) {
   const toast = document.getElementById('toast-notify');
   const tIcon = document.getElementById('toast-icon');
   const tTitle = document.getElementById('toast-title');
@@ -66,12 +66,12 @@ function showToast(title, msg, icon = '⚡', isGreen = true) {
 
   tIcon.innerText = icon;
   tTitle.innerText = title;
-  tTitle.className = isGreen ? 'text-xs font-bold text-emerald-400' : 'text-xs font-bold text-blue-400';
+  tTitle.className = isGreen ? 'text-xs font-mono font-bold text-emerald-400' : 'text-xs font-mono font-bold text-[#1f8fff]';
   tMsg.innerText = msg;
-  toast.className = 'fixed bottom-6 right-6 z-50 bg-gray-900/95 border border-emerald-500 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-500 transform translate-y-0 opacity-100 pointer-events-auto';
+  toast.className = 'fixed bottom-5 right-5 z-50 bg-[#0e1117] border border-[#1f8fff] text-white px-4 py-2.5 rounded shadow-2xl flex items-center space-x-3 transition-all duration-300 transform translate-y-0 opacity-100 pointer-events-auto font-mono';
 
   setTimeout(() => {
-    toast.className = 'fixed bottom-6 right-6 z-50 bg-gray-900/95 border border-emerald-500 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-500 transform translate-y-24 opacity-0 pointer-events-none';
+    toast.className = 'fixed bottom-5 right-5 z-50 bg-[#0e1117] border border-[#1f8fff] text-white px-4 py-2.5 rounded shadow-2xl flex items-center space-x-3 transition-all duration-300 transform translate-y-24 opacity-0 pointer-events-none font-mono';
   }, 4500);
 }
 
@@ -84,13 +84,13 @@ function updateStatusUI() {
   const btnConn = document.getElementById('btn-conn-text');
   if (badge) {
     if (st.connected) {
-      badge.innerText = "Conectado";
-      badge.className = "text-xs px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-700/50";
-      if (btnConn) btnConn.innerText = "Desconectar Caja";
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span><span>CONNECTED</span>';
+      badge.className = "text-[9px] font-mono px-2 py-0.5 rounded uppercase font-semibold bg-[#0d1f18] text-[#10b981] border border-[#10b981]/40 flex items-center gap-1.5";
+      if (btnConn) btnConn.innerText = "UNLINK DEVICE";
     } else {
-      badge.innerText = "Desconectado";
-      badge.className = "text-xs px-2 py-0.5 rounded-full bg-red-900/60 text-red-400 border border-red-700/50";
-      if (btnConn) btnConn.innerText = "Conectar Caja";
+      badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span><span>DISCONNECTED</span>';
+      badge.className = "text-[9px] font-mono px-2 py-0.5 rounded uppercase font-semibold bg-[#1a1114] text-[#ef4444] border border-[#ef4444]/40 flex items-center gap-1.5";
+      if (btnConn) btnConn.innerText = "LINK DEVICE";
     }
   }
 
@@ -135,8 +135,8 @@ function updateStatusUI() {
     const btn = document.getElementById(`btn-anc-${m}`);
     if (btn) {
       btn.className = (st.noise_mode === m)
-        ? 'flex flex-col items-center justify-center p-3 rounded-xl border border-blue-500 bg-blue-950/40 transition'
-        : 'flex flex-col items-center justify-center p-3 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition';
+        ? 'flex flex-col items-center justify-center p-2.5 rounded border border-[#1f8fff] bg-[#1f8fff]/15 transition'
+        : 'flex flex-col items-center justify-center p-2.5 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition';
     }
   });
 
@@ -145,8 +145,8 @@ function updateStatusUI() {
     const btn = document.getElementById(`btn-work-${m}`);
     if (btn) {
       btn.className = (st.work_mode === m)
-        ? 'flex flex-col items-center p-2.5 rounded-xl border border-blue-500 bg-blue-950/40 transition'
-        : 'flex flex-col items-center p-2.5 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition';
+        ? 'flex flex-col items-center p-2 rounded border border-[#1f8fff] bg-[#1f8fff]/15 transition'
+        : 'flex flex-col items-center p-2 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition';
     }
   });
 }
@@ -656,9 +656,9 @@ function updateWidgetButtonsClock() {
   const dayName = days[now.getDay()];
 
   const bClock = document.getElementById('btn-add-clock');
-  if (bClock) bClock.innerHTML = `🕒 Reloj Digital (${hh}:${mm})`;
+  if (bClock) bClock.innerHTML = `<svg class="w-3.5 h-3.5 text-[#1f8fff] inline-block mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>DIGITAL CLOCK (${hh}:${mm})`;
   const bDate = document.getElementById('btn-add-date');
-  if (bDate) bDate.innerHTML = `📅 Fecha & Día (${dayName} ${month}/${day})`;
+  if (bDate) bDate.innerHTML = `<svg class="w-3.5 h-3.5 text-[#1f8fff] inline-block mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>DATE & DAY (${dayName} ${month}/${day})`;
 }
 setInterval(updateWidgetButtonsClock, 1000);
 updateWidgetButtonsClock();
@@ -673,7 +673,7 @@ function updateLayersListUI() {
   project.layers.slice().reverse().forEach(l => {
     const item = document.createElement('div');
     const isSel = l.id === selectedLayerId;
-    item.className = `p-2 rounded-lg border text-xs flex items-center justify-between cursor-pointer transition ${isSel ? 'border-blue-500 bg-blue-950/40 text-white' : 'border-gray-800 bg-gray-800/40 text-gray-300 hover:border-gray-700'}`;
+    item.className = `p-2 rounded border text-xs font-mono flex items-center justify-between cursor-pointer transition ${isSel ? 'border-[#1f8fff] bg-[#1f8fff]/15 text-white' : 'border-[#212633] bg-[#090b10] text-[#7f889b] hover:border-[#333a4d] hover:text-white'}`;
     item.onclick = () => selectLayer(l.id);
     item.innerHTML = `
       <div class="flex items-center space-x-2 truncate">
@@ -1385,7 +1385,7 @@ async function updateThemeSizeUI() {
   if (txtSize) txtSize.innerText = `${kb} KB`;
   if (barSize) {
     barSize.style.width = `${pct}%`;
-    barSize.className = (pct > 95) ? 'bg-red-500 h-2 rounded-full transition-all' : (pct > 75 ? 'bg-amber-500 h-2 rounded-full transition-all' : 'bg-blue-500 h-2 rounded-full transition-all');
+    barSize.className = (pct > 95) ? 'bg-red-500 h-2 rounded-full transition-all' : (pct > 75 ? 'bg-amber-500 h-2 rounded-full transition-all' : 'bg-gradient-to-r from-brand-600 to-brand-400 h-2 rounded-full transition-all');
   }
 }
 
@@ -1558,21 +1558,21 @@ async function loadOfficialGallery() {
   grid.innerHTML = '';
   themes.forEach(t => {
     const card = document.createElement('div');
-    card.className = "bg-gray-900 border border-gray-800 rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-gray-700 transition";
+    card.className = "panel-chassis p-3 flex flex-col justify-between space-y-2 hover:border-[#1f8fff]/60 transition font-mono";
     card.innerHTML = `
-      <div class="relative rounded-xl overflow-hidden screen-bezel bg-black aspect-[320/172] flex items-center justify-center">
+      <div class="relative rounded overflow-hidden screen-chassis bg-black aspect-[320/172] flex items-center justify-center">
         <img src="${t.thumb}" class="w-full h-full object-cover" alt="${t.name}">
       </div>
-      <div>
-        <h4 class="text-sm font-bold truncate text-white">${t.name}</h4>
-        <span class="text-[11px] text-gray-500 font-mono">${(t.size / 1024).toFixed(1)} KB</span>
+      <div class="border-t border-[#1e2330] pt-1">
+        <h4 class="text-xs font-mono font-bold truncate text-white">${t.name}</h4>
+        <span class="text-[10px] text-[#7f889b] font-mono">${(t.size / 1024).toFixed(1)} KB</span>
       </div>
-      <div class="grid grid-cols-2 gap-2 pt-1">
-        <button onclick="loadOfficialToStudio('${t.id}')" class="py-1.5 px-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg text-gray-200 transition">
-          🎨 Editar
+      <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+        <button onclick="loadOfficialToStudio('${t.id}')" class="py-1 px-1.5 btn-tactile text-[10px]">
+          EDIT
         </button>
-        <button onclick="uploadOfficialDirect('${t.id}')" class="py-1.5 px-2 bg-blue-600 hover:bg-blue-500 text-xs font-bold rounded-lg text-white transition">
-          🚀 Subir
+        <button onclick="uploadOfficialDirect('${t.id}')" class="py-1 px-1.5 btn-action-azure text-[10px]">
+          FLASH
         </button>
       </div>
     `;

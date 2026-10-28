@@ -1237,268 +1237,424 @@ def get_studio_ui_html() -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>A9 Pro Studio - Control & Personalizador</title>
+  <title>A9 Pro Studio — Hardware Console & Visual Customizer</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            chassis: {
+              950: '#07080b',
+              900: '#0c0e13',
+              850: '#11131a',
+              800: '#161922',
+              700: '#212532',
+              600: '#2d3345',
+              500: '#434b62',
+            },
+            azure: {
+              500: '#1f8fff',
+              600: '#127ae6',
+              700: '#095db8',
+              800: '#094b94',
+            }
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    body { background-color: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    .screen-bezel { background: #000; border: 4px solid #1f2937; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7); }
-    .slider-vertical { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 110px; }
+    :root {
+      --chassis-bg: #090b0f;
+      --panel-bg: #11141b;
+      --panel-sub: #161922;
+      --border-line: #212633;
+      --border-bright: #313749;
+      --accent-azure: #1f8fff;
+      --led-active: #10b981;
+      --led-warn: #f59e0b;
+      --led-alert: #ef4444;
+      --text-main: #f0f2f5;
+      --text-dim: #7f889b;
+      --text-ghost: #454d5e;
+    }
+    body {
+      background-color: var(--chassis-bg);
+      background-image: 
+        linear-gradient(rgba(33, 38, 51, 0.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(33, 38, 51, 0.35) 1px, transparent 1px);
+      background-size: 28px 28px;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .panel-chassis {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-line);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .screen-chassis {
+      background: #000000;
+      border: 2px solid #282f40;
+      border-radius: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), inset 0 0 16px rgba(0, 0, 0, 0.95);
+    }
+    .hardware-bay {
+      background: radial-gradient(circle at 50% 50%, #151924 0%, #0d0f14 75%);
+      border: 1px solid #1c212c;
+      border-radius: 4px;
+    }
+    .slider-vertical {
+      writing-mode: bt-lr;
+      -webkit-appearance: slider-vertical;
+      width: 4px;
+      height: 105px;
+      accent-color: #1f8fff;
+    }
     canvas {
       image-rendering: -moz-crisp-edges;
       image-rendering: -webkit-crisp-edges;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
+    .img-eq-sign {
+      filter: brightness(0) invert(1);
+      opacity: 0.85;
+    }
+    .btn-tactile {
+      background: #161922;
+      border: 1px solid #262c3b;
+      border-radius: 4px;
+      color: #b5bcc9;
+      font-family: ui-monospace, SFMono-Regular, "Roboto Mono", Menlo, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      transition: all 0.08s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .btn-tactile:hover {
+      background: #1c212d;
+      border-color: #353d52;
+      color: #ffffff;
+    }
+    .btn-tactile:active {
+      transform: translateY(1px);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+    }
+    .btn-action-azure {
+      background: #1f8fff;
+      border: 1px solid #4da7ff;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: ui-monospace, SFMono-Regular, "Roboto Mono", Menlo, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      box-shadow: 0 2px 8px rgba(31, 143, 255, 0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+      transition: all 0.08s ease;
+    }
+    .btn-action-azure:hover {
+      background: #369cff;
+      border-color: #70b8ff;
+    }
+    .btn-action-azure:active {
+      transform: translateY(1px);
+    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #090b0f; }
+    ::-webkit-scrollbar-thumb { background: #1f2533; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2f374c; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col antialiased">
 
-  <!-- Header Superior -->
-  <header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+  <!-- Header Superior Técnico: Consola de Control -->
+  <header class="bg-[#0e1117] border-b border-[#212633] px-6 py-2.5 flex items-center justify-between sticky top-0 z-50">
     <div class="flex items-center space-x-3">
-      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg">A9</div>
+      <div class="w-7 h-7 rounded bg-[#161a24] border border-[#2c3345] flex items-center justify-center font-mono font-bold text-xs text-[#1f8fff]">
+        A9
+      </div>
       <div>
-        <h1 class="text-base font-bold leading-tight flex items-center gap-2">
-          A9 Pro Box & Mate Studio
-          <span id="badge-conn" class="text-xs px-2 py-0.5 rounded-full bg-red-900/60 text-red-400 border border-red-700/50">Desconectado</span>
-        </h1>
-        <p class="text-xs text-gray-400">Bluetooth LE L2CAP (Linux) | Pantalla 320×172 px</p>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-mono font-bold tracking-wider text-white uppercase">A9 Pro // Studio Console</span>
+          <span id="badge-conn" class="text-[9px] font-mono px-2 py-0.5 rounded uppercase font-semibold bg-[#1a1114] text-[#ef4444] border border-[#ef4444]/40 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+            <span>Disconnected</span>
+          </span>
+        </div>
+        <p class="text-[10px] font-mono text-[#616b7f]">PROTOCOL: BLE L2CAP // NATIVE DISP 320x172px</p>
       </div>
     </div>
 
-    <!-- Navegación de Pestañas -->
-    <nav class="flex space-x-1 bg-gray-800/80 p-1 rounded-xl border border-gray-700/50">
-      <button onclick="setTab('device')" id="btn-tab-device" class="px-4 py-1.5 rounded-lg text-sm font-medium transition bg-blue-600 text-white shadow">📱 Mi Dispositivo</button>
-      <button onclick="setTab('studio')" id="btn-tab-studio" class="px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white">🎨 Personalizador de Temas</button>
-      <button onclick="setTab('gallery')" id="btn-tab-gallery" class="px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white">📚 Galería (80 Oficiales)</button>
+    <!-- Navegación de Modos de Consola (Segmented Switch) -->
+    <nav class="flex bg-[#08090d] p-1 rounded border border-[#212633]">
+      <button onclick="setTab('device')" id="btn-tab-device" class="px-3.5 py-1 rounded text-xs font-mono font-semibold transition bg-[#1f8fff] text-white shadow-sm flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        DEVICE DECK
+      </button>
+      <button onclick="setTab('studio')" id="btn-tab-studio" class="px-3.5 py-1 rounded text-xs font-mono font-medium transition text-[#7f889b] hover:text-white flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        THEME STUDIO
+      </button>
+      <button onclick="setTab('gallery')" id="btn-tab-gallery" class="px-3.5 py-1 rounded text-xs font-mono font-medium transition text-[#7f889b] hover:text-white flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        OFFICIAL REPO (80)
+      </button>
     </nav>
 
-    <!-- Conexión Rápida -->
+    <!-- Conexión de Hardware -->
     <div class="flex items-center space-x-2">
-      <button onclick="toggleConnect()" id="btn-conn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow transition flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-        <span id="btn-conn-text">Conectar Caja</span>
+      <button onclick="toggleConnect()" id="btn-conn" class="px-3 py-1.5 text-xs font-mono font-semibold rounded btn-action-azure flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>
+        <span id="btn-conn-text">LINK DEVICE</span>
       </button>
     </div>
   </header>
 
   <!-- Contenido Principal -->
-  <main class="flex-1 p-6 max-w-7xl mx-auto w-full">
+  <main class="flex-1 p-5 max-w-7xl mx-auto w-full">
 
     <!-- ==================== PESTAÑA 1: DISPOSITIVO ORIGINAL ==================== -->
-    <section id="tab-device" class="space-y-6">
+    <section id="tab-device" class="space-y-5">
       
-      <!-- Fila Superior: Renders del Dispositivo y Batería -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Fila Superior: Bahías de Monitoreo de Hardware (L, Estuche, R) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
         
         <!-- Audífono Izquierdo (L) -->
-        <div id="card-earbud-l" class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300">
-          <div class="flex items-center justify-between w-full">
-            <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Audífono Izquierdo (L)</span>
-            <span id="badge-mode-l" class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-800 text-gray-400 border border-gray-700">En uso</span>
+        <div id="card-earbud-l" class="panel-chassis p-4 flex flex-col justify-between relative transition-all duration-200">
+          <div class="flex items-center justify-between border-b border-[#212633] pb-2">
+            <span class="text-[10px] font-mono font-bold tracking-wider text-[#7f889b] uppercase">CH-L // LEFT TRANSDUCER</span>
+            <span id="badge-mode-l" class="text-[9px] font-mono px-2 py-0.5 rounded font-semibold bg-[#181c26] text-[#7f889b] border border-[#262c3b]">STANDBY</span>
           </div>
-          <div class="relative my-3">
-            <img id="img-earbud-l" src="/web_assets/left_earphone.png" class="h-36 object-contain drop-shadow-xl transition-transform duration-300" alt="Left Earbud">
-            <div id="glow-charge-l" class="absolute inset-0 rounded-full bg-emerald-500/10 blur-xl opacity-0 transition-opacity duration-500 pointer-events-none"></div>
+          
+          <div class="hardware-bay my-3 p-3 flex items-center justify-center relative min-h-[160px]">
+            <img id="img-earbud-l" src="/web_assets/left_earphone.png" class="h-32 object-contain drop-shadow-md" alt="Left Earbud">
+            <div id="glow-charge-l" class="absolute inset-0 rounded bg-emerald-500/10 opacity-0 transition-opacity duration-300 pointer-events-none"></div>
           </div>
-          <div class="w-full space-y-1.5">
-            <div class="flex justify-between items-center text-sm font-semibold">
-              <span id="txt-bat-l">0%</span>
-              <span id="icon-charge-l" class="text-xs font-bold text-emerald-400 flex items-center gap-1 hidden">
-                <span class="animate-bounce">⚡</span> Cargando en caja
-              </span>
+
+          <div class="border-t border-[#212633] pt-2 space-y-1.5">
+            <div class="flex justify-between items-center text-xs font-mono">
+              <span class="text-[#7f889b]">PWR LEVEL</span>
+              <div class="flex items-center gap-1.5">
+                <span id="icon-charge-l" class="text-[10px] text-emerald-400 font-mono hidden">CHARGING</span>
+                <span id="txt-bat-l" class="font-bold text-white">0%</span>
+              </div>
             </div>
-            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
-              <div id="bar-bat-l" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            <div class="w-full bg-[#08090d] rounded-sm h-1.5 overflow-hidden border border-[#212633]">
+              <div id="bar-bat-l" class="bg-[#1f8fff] h-1.5 transition-all duration-300" style="width: 0%"></div>
             </div>
           </div>
         </div>
 
         <!-- Estuche Inteligente A9 Pro Box -->
-        <div id="card-box" class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden shadow-2xl transition-all duration-300">
-          <div class="flex items-center justify-between w-full">
-            <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Caja Inteligente A9 Pro Box</span>
-            <span id="txt-firmware" class="text-xs text-gray-500 font-mono">v3.4.0.0</span>
+        <div id="card-box" class="panel-chassis p-4 flex flex-col justify-between relative transition-all duration-200">
+          <div class="flex items-center justify-between border-b border-[#212633] pb-2">
+            <span class="text-[10px] font-mono font-bold tracking-wider text-[#7f889b] uppercase">DOCK // A9 PRO SMART CASE</span>
+            <span id="txt-firmware" class="text-[9px] font-mono text-[#4da7ff]">REV 3.4.0</span>
           </div>
           
-          <div class="relative my-2 inline-block">
-            <img src="/web_assets/connected.png" class="h-44 w-auto object-contain block" alt="A9 Pro Box">
-            <!-- Mockup de la pantalla en vivo dentro del estuche encajada y ligeramente comprimida verticalmente -->
-            <div class="absolute overflow-hidden pointer-events-none" style="top: 43.2%; left: 18.2%; width: 63.6%; height: 34.2%; border-radius: 7px;">
-              <!-- Canvas que renderiza el tema actual a 320x172 -->
-              <canvas id="box-screen-canvas" width="320" height="172" class="w-full h-full object-fill block"></canvas>
-              <!-- Overlay de status bar transparente sobre el tema -->
-              <div class="absolute inset-x-0 top-0 text-[8px] bg-gradient-to-b from-black/80 to-transparent text-gray-200 flex justify-between w-full px-1.5 pt-0.5 pointer-events-none drop-shadow">
-                <span>L <b id="screen-l">100%</b> R <b id="screen-r">100%</b></span>
-                <span id="screen-box">🔋 100%</span>
+          <div class="hardware-bay my-3 p-3 flex items-center justify-center relative min-h-[160px]">
+            <div class="relative inline-block">
+              <img src="/web_assets/connected.png" class="h-36 w-auto object-contain block drop-shadow-md" alt="A9 Pro Box">
+              <!-- Mockup de la pantalla en vivo dentro del estuche encajada -->
+              <div class="absolute overflow-hidden pointer-events-none" style="top: 43.2%; left: 18.2%; width: 63.6%; height: 34.2%; border-radius: 4px;">
+                <canvas id="box-screen-canvas" width="320" height="172" class="w-full h-full object-fill block"></canvas>
+                <div class="absolute inset-x-0 top-0 text-[7px] font-mono bg-black/80 text-[#9ba4b5] flex justify-between w-full px-1 pt-0.5 pointer-events-none">
+                  <span>L:<b id="screen-l" class="text-white">100%</b> R:<b id="screen-r" class="text-white">100%</b></span>
+                  <span id="screen-box" class="text-white">DOCK 100%</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="w-full space-y-1.5">
-            <div class="flex justify-between items-center text-sm font-semibold">
-              <span id="txt-bat-box">0%</span>
-              <span id="icon-charge-box" class="text-xs font-bold text-amber-400 flex items-center gap-1 hidden">
-                <span class="animate-pulse">⚡</span> Conectado a corriente
-              </span>
+          <div class="border-t border-[#212633] pt-2 space-y-1.5">
+            <div class="flex justify-between items-center text-xs font-mono">
+              <span class="text-[#7f889b]">DOCK BATTERY</span>
+              <div class="flex items-center gap-1.5">
+                <span id="icon-charge-box" class="text-[10px] text-amber-400 font-mono hidden">AC ACTIVE</span>
+                <span id="txt-bat-box" class="font-bold text-white">0%</span>
+              </div>
             </div>
-            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
-              <div id="bar-bat-box" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            <div class="w-full bg-[#08090d] rounded-sm h-1.5 overflow-hidden border border-[#212633]">
+              <div id="bar-bat-box" class="bg-emerald-500 h-1.5 transition-all duration-300" style="width: 0%"></div>
             </div>
           </div>
         </div>
 
         <!-- Audífono Derecho (R) -->
-        <div id="card-earbud-r" class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300">
-          <div class="flex items-center justify-between w-full">
-            <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Audífono Derecho (R)</span>
-            <span id="badge-mode-r" class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-800 text-gray-400 border border-gray-700">En uso</span>
+        <div id="card-earbud-r" class="panel-chassis p-4 flex flex-col justify-between relative transition-all duration-200">
+          <div class="flex items-center justify-between border-b border-[#212633] pb-2">
+            <span class="text-[10px] font-mono font-bold tracking-wider text-[#7f889b] uppercase">CH-R // RIGHT TRANSDUCER</span>
+            <span id="badge-mode-r" class="text-[9px] font-mono px-2 py-0.5 rounded font-semibold bg-[#181c26] text-[#7f889b] border border-[#262c3b]">STANDBY</span>
           </div>
-          <div class="relative my-3">
-            <img id="img-earbud-r" src="/web_assets/right_earphone.png" class="h-36 object-contain drop-shadow-xl transition-transform duration-300" alt="Right Earbud">
-            <div id="glow-charge-r" class="absolute inset-0 rounded-full bg-emerald-500/10 blur-xl opacity-0 transition-opacity duration-500 pointer-events-none"></div>
+          
+          <div class="hardware-bay my-3 p-3 flex items-center justify-center relative min-h-[160px]">
+            <img id="img-earbud-r" src="/web_assets/right_earphone.png" class="h-32 object-contain drop-shadow-md" alt="Right Earbud">
+            <div id="glow-charge-r" class="absolute inset-0 rounded bg-emerald-500/10 opacity-0 transition-opacity duration-300 pointer-events-none"></div>
           </div>
-          <div class="w-full space-y-1.5">
-            <div class="flex justify-between items-center text-sm font-semibold">
-              <span id="txt-bat-r">0%</span>
-              <span id="icon-charge-r" class="text-xs font-bold text-emerald-400 flex items-center gap-1 hidden">
-                <span class="animate-bounce">⚡</span> Cargando en caja
-              </span>
+
+          <div class="border-t border-[#212633] pt-2 space-y-1.5">
+            <div class="flex justify-between items-center text-xs font-mono">
+              <span class="text-[#7f889b]">PWR LEVEL</span>
+              <div class="flex items-center gap-1.5">
+                <span id="icon-charge-r" class="text-[10px] text-emerald-400 font-mono hidden">CHARGING</span>
+                <span id="txt-bat-r" class="font-bold text-white">0%</span>
+              </div>
             </div>
-            <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
-              <div id="bar-bat-r" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            <div class="w-full bg-[#08090d] rounded-sm h-1.5 overflow-hidden border border-[#212633]">
+              <div id="bar-bat-r" class="bg-[#1f8fff] h-1.5 transition-all duration-300" style="width: 0%"></div>
             </div>
           </div>
         </div>
 
       </div>
 
-      <!-- Notificación flotante Toast en tiempo real -->
-      <div id="toast-notify" class="fixed bottom-6 right-6 z-50 bg-gray-900/95 border border-emerald-500 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-500 transform translate-y-24 opacity-0 pointer-events-none">
-        <span id="toast-icon" class="text-xl">⚡</span>
+      <!-- Notificación Toast Industrial -->
+      <div id="toast-notify" class="fixed bottom-5 right-5 z-50 bg-[#0e1117] border border-[#1f8fff] text-white px-4 py-2.5 rounded shadow-2xl flex items-center space-x-3 transition-all duration-300 transform translate-y-24 opacity-0 pointer-events-none">
+        <span id="toast-icon" class="text-sm font-mono text-[#1f8fff]">INFO</span>
         <div>
-          <h4 id="toast-title" class="text-xs font-bold text-emerald-400">Estado de Carga</h4>
-          <p id="toast-msg" class="text-xs text-gray-300">Auricular insertado en el estuche.</p>
+          <h4 id="toast-title" class="text-xs font-mono font-bold text-[#1f8fff]">TELEMETRY</h4>
+          <p id="toast-msg" class="text-[11px] font-mono text-[#9ba4b5]">Status updated.</p>
         </div>
       </div>
 
-      <!-- Barra de Acciones y Sincronización Horaria -->
-      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-2">
-            <button onclick="requestBattery()" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg shadow transition flex items-center gap-1.5">
-              🔄 Consultar Batería / Estado
-            </button>
-          </div>
-          <div class="flex items-center space-x-2 text-xs text-gray-400">
-            <span>MAC: <b id="txt-mac" class="font-mono text-gray-200">41:42:6C:C2:DD:3C</b></span>
-            <span>|</span>
-            <span>Resolución: <b class="text-gray-200">320×172 px</b></span>
-            <span>|</span>
-            <span>Límite: <b class="text-gray-200">150 KB</b></span>
-          </div>
+      <!-- Barra de Acciones y Telemetría -->
+      <div class="panel-chassis px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+        <div class="flex items-center gap-2">
+          <button onclick="requestBattery()" class="px-3 py-1 btn-tactile flex items-center gap-1.5">
+            <svg class="w-3 h-3 text-[#1f8fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            POLL TELEMETRY
+          </button>
+        </div>
+        <div class="flex items-center space-x-4 text-[11px] text-[#7f889b]">
+          <span>MAC: <b id="txt-mac" class="text-white">41:42:6C:C2:DD:3C</b></span>
+          <span>|</span>
+          <span>DISP: <b class="text-white">320×172 px</b></span>
+          <span>|</span>
+          <span>SRAM BUFFER: <b class="text-white">153.6 KB</b></span>
         </div>
       </div>
 
-      <!-- Fila de Controles Oficiales (ANC, Modos, Ecualizador) -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Módulos de Control Técnico (ANC, Modos, Ecualizador, Búsqueda) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        <!-- Control de Ruido (ANC) -->
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
-          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400">Control de Ruido</h2>
+        <!-- Módulo 1: Control de Ruido y Modo de Sonido -->
+        <div class="panel-chassis p-4 space-y-4">
+          <div class="border-b border-[#212633] pb-1.5 flex justify-between items-center">
+            <h2 class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#7f889b]">DSP // NOISE CANCELLATION</h2>
+            <span class="text-[9px] font-mono text-[#525a6c]">ANC 0x14</span>
+          </div>
+
           <div class="grid grid-cols-3 gap-2">
-            <button onclick="setNoiseMode(0)" id="btn-anc-0" class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
-              <img src="/web_assets/immerse_blue.png" class="w-8 h-8 mb-2 object-contain" alt="ANC">
-              <span class="text-xs font-semibold">Cancelación</span>
+            <button onclick="setNoiseMode(0)" id="btn-anc-0" class="flex flex-col items-center justify-center p-2.5 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition">
+              <img src="/web_assets/immerse_blue.png" class="w-6 h-6 mb-1 object-contain" alt="ANC">
+              <span class="text-[10px] font-mono font-semibold">CANCEL</span>
             </button>
-            <button onclick="setNoiseMode(1)" id="btn-anc-1" class="flex flex-col items-center justify-center p-3 rounded-xl border border-blue-500 bg-blue-950/40 transition">
-              <img src="/web_assets/mild_blue.png" class="w-8 h-8 mb-2 object-contain" alt="Normal">
-              <span class="text-xs font-semibold">Normal</span>
+            <button onclick="setNoiseMode(1)" id="btn-anc-1" class="flex flex-col items-center justify-center p-2.5 rounded border border-[#1f8fff] bg-[#1f8fff]/15 transition">
+              <img src="/web_assets/mild_blue.png" class="w-6 h-6 mb-1 object-contain" alt="Normal">
+              <span class="text-[10px] font-mono font-semibold text-white">NORMAL</span>
             </button>
-            <button onclick="setNoiseMode(2)" id="btn-anc-2" class="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
-              <img src="/web_assets/transparent_blue.png" class="w-8 h-8 mb-2 object-contain" alt="Transparente">
-              <span class="text-xs font-semibold">Ambiente</span>
+            <button onclick="setNoiseMode(2)" id="btn-anc-2" class="flex flex-col items-center justify-center p-2.5 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition">
+              <img src="/web_assets/transparent_blue.png" class="w-6 h-6 mb-1 object-contain" alt="Transparente">
+              <span class="text-[10px] font-mono font-semibold">AMBIENT</span>
             </button>
           </div>
 
-          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 pt-2">Modo de Sonido</h2>
+          <div class="border-b border-[#212633] pb-1.5 pt-1 flex justify-between items-center">
+            <h2 class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#7f889b]">DSP // SOUND PROFILE</h2>
+            <span class="text-[9px] font-mono text-[#525a6c]">PROFILE 0x07</span>
+          </div>
+
           <div class="grid grid-cols-3 gap-2">
-            <button onclick="setWorkMode(0)" id="btn-work-0" class="flex flex-col items-center p-2.5 rounded-xl border border-blue-500 bg-blue-950/40 transition">
-              <img src="/web_assets/music_mode.png" class="w-7 h-7 mb-1 object-contain" alt="Música">
-              <span class="text-xs font-medium">Música</span>
+            <button onclick="setWorkMode(0)" id="btn-work-0" class="flex flex-col items-center p-2 rounded border border-[#1f8fff] bg-[#1f8fff]/15 transition">
+              <img src="/web_assets/music_mode.png" class="w-5 h-5 mb-1 object-contain" alt="Música">
+              <span class="text-[10px] font-mono font-medium text-white">MUSIC</span>
             </button>
-            <button onclick="setWorkMode(1)" id="btn-work-1" class="flex flex-col items-center p-2.5 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
-              <img src="/web_assets/game_mode.png" class="w-7 h-7 mb-1 object-contain" alt="Juego">
-              <span class="text-xs font-medium">Baja Latencia</span>
+            <button onclick="setWorkMode(1)" id="btn-work-1" class="flex flex-col items-center p-2 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition">
+              <img src="/web_assets/game_mode.png" class="w-5 h-5 mb-1 object-contain" alt="Juego">
+              <span class="text-[10px] font-mono font-medium text-[#7f889b]">LOW-LAT</span>
             </button>
-            <button onclick="setWorkMode(2)" id="btn-work-2" class="flex flex-col items-center p-2.5 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition">
-              <img src="/web_assets/movie_mode.png" class="w-7 h-7 mb-1 object-contain" alt="Película">
-              <span class="text-xs font-medium">Película</span>
+            <button onclick="setWorkMode(2)" id="btn-work-2" class="flex flex-col items-center p-2 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition">
+              <img src="/web_assets/movie_mode.png" class="w-5 h-5 mb-1 object-contain" alt="Película">
+              <span class="text-[10px] font-mono font-medium text-[#7f889b]">CINEMA</span>
             </button>
           </div>
         </div>
 
-        <!-- Ecualizador de 10 Bandas -->
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-              <img src="/web_assets/main_eq_sign.png" class="w-4 h-4 object-contain" alt="EQ">
-              Ecualizador 10 Bandas
+        <!-- Módulo 2: Ecualizador de 10 Bandas -->
+        <div class="panel-chassis p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-[#212633] pb-1.5">
+            <h2 class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#7f889b] flex items-center gap-1.5">
+              <img src="/web_assets/main_eq_sign.png" class="w-3.5 h-3.5 object-contain img-eq-sign" alt="EQ">
+              GRAPHIC EQUALIZER // 10-BAND
             </h2>
-            <select id="sel-eq-preset" onchange="applyEqPreset(this.value)" class="text-xs bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-gray-200">
-              <option value="0">Estándar</option>
-              <option value="1">Pop</option>
-              <option value="2">Rock</option>
-              <option value="3">Jazz</option>
-              <option value="4">Clásica</option>
-              <option value="5">Vocal</option>
+            <select id="sel-eq-preset" onchange="applyEqPreset(this.value)" class="text-[10px] font-mono bg-[#08090d] border border-[#262c3b] rounded px-2 py-0.5 text-white focus:border-[#1f8fff] focus:outline-none">
+              <option value="0">PRESET: STANDARD</option>
+              <option value="1">PRESET: POP</option>
+              <option value="2">PRESET: ROCK</option>
+              <option value="3">PRESET: JAZZ</option>
+              <option value="4">PRESET: CLASSIC</option>
+              <option value="5">PRESET: VOCAL</option>
             </select>
           </div>
 
-          <!-- Sliders de 10 bandas -->
-          <div class="flex justify-between items-center px-1 pt-2">
-            <!-- Bandas generadas dinámicamente -->
+          <div class="bg-[#08090d] border border-[#1b1f2b] p-2 rounded flex justify-between items-center">
             <div id="eq-sliders-container" class="flex justify-between w-full text-center"></div>
           </div>
-          <button onclick="applyCustomEq()" class="w-full py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-xs font-semibold text-gray-200 transition">
-            Aplicar Ecualización a la Caja
+
+          <button onclick="applyCustomEq()" class="w-full py-1.5 btn-tactile text-xs flex items-center justify-center gap-1.5">
+            <svg class="w-3 h-3 text-[#1f8fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            COMMIT EQ REGISTERS
           </button>
         </div>
 
-        <!-- Buscar Audífonos & Ajustes -->
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
-          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-            <img src="/web_assets/main_find.png" class="w-4 h-4 object-contain" alt="Find">
-            Buscar Mis Audífonos (Beep)
-          </h2>
+        <!-- Módulo 3: Buscar Audífonos & Mapeo Táctil -->
+        <div class="panel-chassis p-4 space-y-3">
+          <div class="border-b border-[#212633] pb-1.5 flex justify-between items-center">
+            <h2 class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#7f889b] flex items-center gap-1.5">
+              <img src="/web_assets/main_find.png" class="w-3.5 h-3.5 object-contain" alt="Find">
+              ACOUSTIC LOCALIZER // PING
+            </h2>
+            <span class="text-[9px] font-mono text-[#525a6c]">0x17 BEACON</span>
+          </div>
+
           <div class="grid grid-cols-3 gap-2">
-            <button onclick="findEarbuds(true, false)" class="p-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-semibold transition">
-              Izquierdo (L)
+            <button onclick="findEarbuds(true, false)" class="p-2 btn-tactile text-center">
+              PING L
             </button>
-            <button onclick="findEarbuds(false, true)" class="p-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-semibold transition">
-              Derecho (R)
+            <button onclick="findEarbuds(false, true)" class="p-2 btn-tactile text-center">
+              PING R
             </button>
-            <button onclick="findEarbuds(true, true)" class="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition">
-              Ambos 🔊
+            <button onclick="findEarbuds(true, true)" class="p-2 btn-action-azure text-center">
+              PING BOTH
             </button>
           </div>
 
-          <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 pt-3 flex items-center gap-2">
-            <img src="/web_assets/main_gesture_control.png" class="w-4 h-4 object-contain" alt="Gestures">
-            Control Táctil Rápido
-          </h2>
-          <div class="text-xs text-gray-400 space-y-2">
-            <div class="flex justify-between items-center bg-gray-800/40 p-2 rounded-lg">
-              <span>1 Toque (L/R)</span>
-              <span class="text-gray-200 font-semibold">Pausar / Reproducir</span>
+          <div class="border-b border-[#212633] pb-1.5 pt-1">
+            <h2 class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#7f889b] flex items-center gap-1.5">
+              <img src="/web_assets/main_gesture_control.png" class="w-3.5 h-3.5 object-contain" alt="Gestures">
+              TOUCH SENSOR SCHEMATIC
+            </h2>
+          </div>
+
+          <div class="text-[10px] font-mono space-y-1.5">
+            <div class="flex justify-between items-center bg-[#08090d] border border-[#1c212d] p-1.5 rounded">
+              <span class="text-[#7f889b]">1x TAP (L/R)</span>
+              <span class="text-white font-semibold">PLAY / PAUSE</span>
             </div>
-            <div class="flex justify-between items-center bg-gray-800/40 p-2 rounded-lg">
-              <span>2 Toques (L/R)</span>
-              <span class="text-gray-200 font-semibold">Siguiente Canción</span>
+            <div class="flex justify-between items-center bg-[#08090d] border border-[#1c212d] p-1.5 rounded">
+              <span class="text-[#7f889b]">2x TAP (L/R)</span>
+              <span class="text-white font-semibold">NEXT TRACK</span>
             </div>
-            <div class="flex justify-between items-center bg-gray-800/40 p-2 rounded-lg">
-              <span>Pulsación Larga</span>
-              <span class="text-gray-200 font-semibold">Cambiar ANC / Siri</span>
+            <div class="flex justify-between items-center bg-[#08090d] border border-[#1c212d] p-1.5 rounded">
+              <span class="text-[#7f889b]">LONG PRESS</span>
+              <span class="text-white font-semibold">TOGGLE ANC / VOICE</span>
             </div>
           </div>
         </div>
@@ -1509,107 +1665,115 @@ def get_studio_ui_html() -> str:
 
 
     <!-- ==================== PESTAÑA 2: PERSONALIZADOR DE TEMAS ==================== -->
-    <section id="tab-studio" class="space-y-6 hidden">
+    <section id="tab-studio" class="space-y-5 hidden">
       
-      <!-- Controles de cabecera del estudio -->
-      <div class="flex flex-wrap items-center justify-between gap-4 bg-gray-900 border border-gray-800 p-4 rounded-2xl">
-        <div class="flex items-center space-x-2">
-          <span class="text-sm font-bold">Lienzo 320×172</span>
-          <span class="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400 font-mono">Zoom 2.5×</span>
+      <!-- Barra Superior de Parámetros de Compilación -->
+      <div class="panel-chassis px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-3 text-xs font-mono">
+          <span class="text-white font-bold tracking-wider">CANVAS // 320x172 px</span>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-[#08090d] text-[#7f889b] border border-[#212633]">SCALE 2.5X</span>
         </div>
 
         <!-- Indicador de Peso vs Límite 153.6 KB -->
         <div class="flex items-center space-x-3">
-          <div class="text-right">
-            <div class="text-xs text-gray-400">Peso Estimado: <b id="txt-theme-size" class="text-white font-mono">0 KB</b> / 150 KB</div>
-            <div class="w-36 bg-gray-800 h-2 rounded-full overflow-hidden mt-1">
-              <div id="bar-theme-size" class="bg-blue-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+          <div class="text-right font-mono">
+            <div class="text-[11px] text-[#7f889b]">BUFFER: <b id="txt-theme-size" class="text-white">0 KB</b> / 150 KB</div>
+            <div class="w-32 bg-[#08090d] h-1.5 rounded-sm overflow-hidden border border-[#212633] mt-1">
+              <div id="bar-theme-size" class="bg-[#1f8fff] h-1.5 transition-all" style="width: 0%"></div>
             </div>
           </div>
-          <button onclick="resetDefaultTheme()" class="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-sm font-semibold rounded-xl border border-gray-700 text-gray-300 hover:text-white transition flex items-center gap-1.5" title="Restablecer tema al predeterminado oficial (Cyberpunk 385)">
-            🔄 Predeterminado
+          <button onclick="resetDefaultTheme()" class="px-3 py-1.5 btn-tactile flex items-center gap-1.5" title="Restablecer tema al predeterminado oficial (Cyberpunk 385)">
+            <svg class="w-3.5 h-3.5 text-[#7f889b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            RESET
           </button>
-          <button onclick="compileTheme()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm font-semibold rounded-xl border border-gray-700 transition">
-            ⚙️ Compilar
+          <button onclick="compileTheme()" class="px-3.5 py-1.5 btn-tactile flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-[#7f889b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            BUILD .BIN
           </button>
-          <button onclick="uploadCurrentTheme()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl shadow-lg transition flex items-center gap-2">
-            🚀 Subir a la Caja
+          <button onclick="uploadCurrentTheme()" class="px-4 py-1.5 btn-action-azure flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            FLASH TO CASE
           </button>
         </div>
       </div>
 
-      <!-- Área de Trabajo Principal: Lienzo + Inspector de Capas -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <!-- Área de Trabajo Principal: Lienzo 320x172 + Inspector de Capas -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
         <!-- Lienzo Central (320x172 escalado a 800x430) -->
-        <div class="lg:col-span-8 flex flex-col items-center justify-center p-6 bg-gray-900 border border-gray-800 rounded-2xl space-y-4">
-          <div class="relative screen-bezel p-1">
-            <canvas id="theme-canvas" width="320" height="172" class="w-[800px] h-[430px] rounded cursor-crosshair bg-black block"></canvas>
+        <div class="lg:col-span-8 flex flex-col items-center justify-center p-5 panel-chassis space-y-3">
+          <div class="relative screen-chassis p-1">
+            <canvas id="theme-canvas" width="320" height="172" class="w-[800px] h-[430px] rounded-[3px] cursor-crosshair bg-black block"></canvas>
             
             <!-- Barra de estado simulada superior -->
-            <div id="canvas-overlay-status" class="absolute top-2 left-3 right-3 flex justify-between items-center text-[11px] text-white/90 font-semibold px-2 pointer-events-none drop-shadow">
+            <div id="canvas-overlay-status" class="absolute top-2 left-3 right-3 flex justify-between items-center text-[10px] font-mono text-white/80 px-1 pointer-events-none drop-shadow">
               <span>L 100%  R 100%</span>
-              <span>🔋 100%</span>
+              <span>DOCK 100%</span>
             </div>
           </div>
 
-          <!-- Barra de Configuración Tipográfica Global para Números/Fechas -->
-          <div class="w-full bg-gray-950/60 border border-gray-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <!-- Barra Tipográfica Global -->
+          <div class="w-full bg-[#090b10] border border-[#212633] rounded px-3 py-2 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
             <div class="flex items-center gap-2">
-              <span class="text-gray-400 font-semibold">🔤 Fuente:</span>
-              <select id="sel-font-family" onchange="onFontSettingsChange()" class="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1 text-xs">
-                <option value="orbitron">Orbitron Sci-Fi (Futurista)</option>
+              <span class="text-[#7f889b]">FONT:</span>
+              <select id="sel-font-family" onchange="onFontSettingsChange()" class="bg-[#121620] border border-[#282f40] text-white rounded px-2 py-0.5 text-xs focus:border-[#1f8fff] focus:outline-none">
+                <option value="orbitron">Orbitron (Futurista)</option>
                 <option value="tech">Share Tech Mono (Digital LED)</option>
-                <option value="bebas">Bebas Neue (Condensada Alta)</option>
+                <option value="bebas">Bebas Neue (Condensada)</option>
                 <option value="pixel">Press Start 2P (Retro 8-Bit)</option>
                 <option value="opensans" selected>Open Sans ExtraBold</option>
                 <option value="fira">Fira Sans Bold</option>
                 <option value="hack">Hack Monospace</option>
                 <option value="dejavu">DejaVu Sans Bold</option>
               </select>
-              <label class="px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-[11px] cursor-pointer flex items-center gap-1">
-                📁 Subir .TTF
+              <label class="px-2 py-0.5 btn-tactile cursor-pointer flex items-center gap-1">
+                IMPORT .TTF
                 <input type="file" accept=".ttf,.otf" class="hidden" onchange="handleCustomFontUpload(event)">
               </label>
             </div>
 
             <div class="flex items-center gap-3">
               <div class="flex items-center gap-1.5">
-                <span class="text-gray-400">Color:</span>
-                <input type="color" id="inp-font-color" value="#FFFFFF" onchange="onFontSettingsChange()" class="w-6 h-6 rounded bg-transparent cursor-pointer border border-gray-700">
+                <span class="text-[#7f889b]">COLOR:</span>
+                <input type="color" id="inp-font-color" value="#FFFFFF" onchange="onFontSettingsChange()" class="w-5 h-5 rounded bg-transparent cursor-pointer border border-[#282f40]">
               </div>
               <div class="flex items-center gap-1.5">
-                <span class="text-gray-400">Borde:</span>
-                <input type="color" id="inp-font-stroke" value="#000000" onchange="onFontSettingsChange()" class="w-6 h-6 rounded bg-transparent cursor-pointer border border-gray-700">
+                <span class="text-[#7f889b]">BORDER:</span>
+                <input type="color" id="inp-font-stroke" value="#000000" onchange="onFontSettingsChange()" class="w-5 h-5 rounded bg-transparent cursor-pointer border border-[#282f40]">
               </div>
-              <button onclick="applyFontToAllWidgets()" class="px-2.5 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded font-semibold text-[11px] transition">
-                ⚡ Aplicar a Todo
+              <button onclick="applyFontToAllWidgets()" class="px-2.5 py-0.5 btn-action-azure text-[10px]">
+                APPLY ALL
               </button>
             </div>
           </div>
 
           <!-- Barra de Herramientas para Añadir Elementos -->
-          <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <label class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold cursor-pointer border border-gray-700 transition flex items-center gap-1.5">
-              🖼️ Fondo (320×172)
+          <div class="flex flex-wrap items-center justify-center gap-2 pt-1 font-mono text-xs">
+            <label class="px-3 py-1.5 btn-tactile cursor-pointer flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#1f8fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              + BACKGROUND (320x172)
               <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event, 'background')">
             </label>
-            <label class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold cursor-pointer border border-gray-700 transition flex items-center gap-1.5">
-              🦸 Personaje PNG (Profundidad)
+            <label class="px-3 py-1.5 btn-tactile cursor-pointer flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#1f8fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5z"/></svg>
+              + OVERLAY PNG
               <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event, 'overlay')">
             </label>
-            <button id="btn-add-clock" onclick="addClockWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
-              🕒 Reloj Digital (09:28)
+            <button id="btn-add-clock" onclick="addClockWidget()" class="px-3 py-1.5 btn-tactile flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#1f8fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              + CLOCK (09:28)
             </button>
-            <button id="btn-add-date" onclick="addDateWidget()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold border border-gray-700 transition">
-              📅 Fecha & Día (DOM 10/24)
+            <button id="btn-add-date" onclick="addDateWidget()" class="px-3 py-1.5 btn-tactile flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#1f8fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              + DATE (DOM 10/24)
             </button>
-            <label class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold cursor-pointer border border-gray-700 transition flex items-center gap-1.5">
-              ✨ Subir Tu GIF
+            <label class="px-3 py-1.5 btn-tactile cursor-pointer flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#1f8fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              + IMPORT GIF
               <input type="file" accept="image/gif" class="hidden" onchange="handleGifUpload(event)">
             </label>
-            <button onclick="loadSampleReactorGif()" class="px-3 py-1.5 bg-cyan-900/60 hover:bg-cyan-800/80 text-cyan-300 rounded-lg text-xs font-semibold border border-cyan-700/60 transition flex items-center gap-1.5">
-              ⚡ Probar Reactor GIF
+            <button onclick="loadSampleReactorGif()" class="px-3 py-1.5 bg-[#0f1f33] hover:bg-[#152e4d] text-[#6bb5ff] border border-[#1f8fff]/40 rounded font-mono text-xs font-semibold transition flex items-center gap-1.5">
+              SAMPLE REACTOR
             </button>
           </div>
         </div>
@@ -1617,172 +1781,158 @@ def get_studio_ui_html() -> str:
         <!-- Panel Lateral: Capas & Inspector de Propiedades -->
         <div class="lg:col-span-4 space-y-4">
           
-          <!-- Lista de Capas (Orden Z) con Botones de Acción en la Parte Superior -->
-          <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
-            <div class="flex justify-between items-center">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Capas del Tema (Orden Z)</h3>
-              <span id="txt-layer-count" class="text-xs text-gray-500">0 capas</span>
+          <!-- Lista de Capas (Orden Z) -->
+          <div class="panel-chassis p-4 space-y-2.5">
+            <div class="flex justify-between items-center border-b border-[#212633] pb-1.5">
+              <h3 class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#7f889b]">LAYER HIERARCHY (Z-STACK)</h3>
+              <span id="txt-layer-count" class="text-[10px] font-mono text-[#525a6c]">0 LAYERS</span>
             </div>
 
-            <!-- Botones de Control de Capa: Subir, Bajar y Eliminar arriba de la lista -->
-            <div class="flex items-center gap-1.5 bg-gray-950/50 p-1.5 rounded-xl border border-gray-800/80">
-              <button onclick="moveLayerUp()" class="flex-1 py-1.5 px-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1" title="Subir nivel de capa (traer adelante)">
-                ⬆️ Subir
+            <!-- Botones de Control de Capa -->
+            <div class="flex items-center gap-1.5 bg-[#08090d] p-1 rounded border border-[#1c212c]">
+              <button onclick="moveLayerUp()" class="flex-1 py-1 px-2 btn-tactile text-[10px] flex items-center justify-center gap-1" title="Subir nivel de capa">
+                ▲ UP
               </button>
-              <button onclick="moveLayerDown()" class="flex-1 py-1.5 px-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1" title="Bajar nivel de capa (enviar atrás)">
-                ⬇️ Bajar
+              <button onclick="moveLayerDown()" class="flex-1 py-1 px-2 btn-tactile text-[10px] flex items-center justify-center gap-1" title="Bajar nivel de capa">
+                ▼ DOWN
               </button>
-              <button onclick="deleteLayer()" class="py-1.5 px-3 bg-red-900/40 hover:bg-red-800/60 text-red-400 border border-red-800/50 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1" title="Eliminar capa seleccionada">
-                🗑️ Eliminar
+              <button onclick="deleteLayer()" class="py-1 px-3 bg-[#1f1013] hover:bg-[#2e151a] text-[#ef4444] border border-[#ef4444]/30 rounded text-[10px] font-mono font-semibold transition flex items-center justify-center gap-1" title="Eliminar capa">
+                ✕ REMOVE
               </button>
             </div>
 
-            <div id="layers-list" class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+            <div id="layers-list" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
               <!-- Elementos de capa generados dinámicamente -->
             </div>
           </div>
 
           <!-- Inspector del Elemento Seleccionado -->
-          <div id="inspector-panel" class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Propiedades de la Capa</h3>
+          <div id="inspector-panel" class="panel-chassis p-4 space-y-3 font-mono">
+            <div class="border-b border-[#212633] pb-1.5">
+              <h3 class="text-[10px] font-bold uppercase tracking-wider text-[#7f889b]">LAYER PARAMETERS</h3>
+            </div>
             
-            <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <label class="text-gray-400">Posición X (Centro)</label>
-                <input type="number" id="inp-x" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 mt-1 text-white font-mono" onchange="updateSelectedCoord('x', this.value)">
+                <label class="text-[10px] text-[#7f889b]">POS X (CENTER)</label>
+                <input type="number" id="inp-x" class="w-full bg-[#08090d] border border-[#212633] rounded px-2 py-0.5 mt-0.5 text-white font-mono text-xs focus:border-[#1f8fff] focus:outline-none" onchange="updateSelectedCoord('x', this.value)">
               </div>
               <div>
-                <label class="text-gray-400">Posición Y (Centro)</label>
-                <input type="number" id="inp-y" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 mt-1 text-white font-mono" onchange="updateSelectedCoord('y', this.value)">
+                <label class="text-[10px] text-[#7f889b]">POS Y (CENTER)</label>
+                <input type="number" id="inp-y" class="w-full bg-[#08090d] border border-[#212633] rounded px-2 py-0.5 mt-0.5 text-white font-mono text-xs focus:border-[#1f8fff] focus:outline-none" onchange="updateSelectedCoord('y', this.value)">
               </div>
             </div>
 
-            <!-- Ajuste Manual de Tamaño (Ancho × Alto) y Escala -->
-            <div class="space-y-1.5 pt-1">
-              <div class="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label class="text-gray-400">Ancho (px)</label>
-                  <input type="number" id="inp-w" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 mt-1 text-white font-mono" onchange="updateSelectedSize('w', this.value)">
-                </div>
-                <div>
-                  <label class="text-gray-400">Alto (px)</label>
-                  <input type="number" id="inp-h" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 mt-1 text-white font-mono" onchange="updateSelectedSize('h', this.value)">
-                </div>
+            <!-- Ajuste Manual de Tamaño (Ancho × Alto) -->
+            <div class="grid grid-cols-2 gap-2 text-xs pt-0.5">
+              <div>
+                <label class="text-[10px] text-[#7f889b]">WIDTH (PX)</label>
+                <input type="number" id="inp-w" class="w-full bg-[#08090d] border border-[#212633] rounded px-2 py-0.5 mt-0.5 text-white font-mono text-xs focus:border-[#1f8fff] focus:outline-none" onchange="updateSelectedSize('w', this.value)">
               </div>
-              
-
+              <div>
+                <label class="text-[10px] text-[#7f889b]">HEIGHT (PX)</label>
+                <input type="number" id="inp-h" class="w-full bg-[#08090d] border border-[#212633] rounded px-2 py-0.5 mt-0.5 text-white font-mono text-xs focus:border-[#1f8fff] focus:outline-none" onchange="updateSelectedSize('h', this.value)">
+              </div>
             </div>
 
             <!-- Botones de alineación rápida -->
             <div class="space-y-1 pt-1">
-              <span class="text-[10px] text-gray-500 uppercase">Alineación Rápida</span>
-              <div class="grid grid-cols-3 gap-1 text-[11px]">
-                <button onclick="alignSelected('top-left')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Arr-Izq</button>
-                <button onclick="alignSelected('top-center')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Arr-Cen</button>
-                <button onclick="alignSelected('top-right')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Arr-Der</button>
-                <button onclick="alignSelected('mid-left')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Med-Izq</button>
-                <button onclick="alignSelected('center')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Centro</button>
-                <button onclick="alignSelected('mid-right')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Med-Der</button>
-                <button onclick="alignSelected('bottom-left')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Abj-Izq</button>
-                <button onclick="alignSelected('bottom-center')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Abj-Cen</button>
-                <button onclick="alignSelected('bottom-right')" class="p-1 bg-gray-800 rounded hover:bg-gray-700">Abj-Der</button>
+              <span class="text-[9px] text-[#525a6c] uppercase">QUICK ANCHOR</span>
+              <div class="grid grid-cols-3 gap-1 text-[10px]">
+                <button onclick="alignSelected('top-left')" class="p-1 btn-tactile">TL</button>
+                <button onclick="alignSelected('top-center')" class="p-1 btn-tactile">TC</button>
+                <button onclick="alignSelected('top-right')" class="p-1 btn-tactile">TR</button>
+                <button onclick="alignSelected('mid-left')" class="p-1 btn-tactile">ML</button>
+                <button onclick="alignSelected('center')" class="p-1 btn-tactile">MID</button>
+                <button onclick="alignSelected('mid-right')" class="p-1 btn-tactile">MR</button>
+                <button onclick="alignSelected('bottom-left')" class="p-1 btn-tactile">BL</button>
+                <button onclick="alignSelected('bottom-center')" class="p-1 btn-tactile">BC</button>
+                <button onclick="alignSelected('bottom-right')" class="p-1 btn-tactile">BR</button>
               </div>
             </div>
 
             <!-- Herramientas de Compresión y Calidad de Imagen -->
-            <div id="inspector-compress-box" class="space-y-2 pt-2 border-t border-gray-800">
-              <div class="flex justify-between items-center text-[11px]">
-                <span class="text-gray-400 font-semibold">Dimensiones</span>
-                <span id="txt-layer-dims" class="text-gray-300 font-mono">0×0 px</span>
+            <div id="inspector-compress-box" class="space-y-2 pt-2 border-t border-[#212633]">
+              <div class="flex justify-between items-center text-[10px]">
+                <span class="text-[#7f889b]">DIMENSIONS:</span>
+                <span id="txt-layer-dims" class="text-white font-mono">0x0 px</span>
               </div>
               
               <!-- Ajuste de Escala a Pantalla Completa (Toggle) -->
-              <button id="btn-toggle-fullscreen" onclick="toggleLayerFullScreen()" class="w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition" title="Activa o desactiva el ajuste automático a pantalla completa (320×172)">
-                <span>📐 Pantalla Completa (320×172):</span>
-                <span id="txt-fullscreen-status" class="font-bold text-gray-400">OFF</span>
+              <button id="btn-toggle-fullscreen" onclick="toggleLayerFullScreen()" class="w-full p-1.5 btn-tactile flex items-center justify-between px-2 text-[10px]" title="Activa o desactiva el ajuste automático a pantalla completa (320x172)">
+                <span>FULLSCREEN 320x172:</span>
+                <span id="txt-fullscreen-status" class="font-bold text-[#7f889b]">OFF</span>
               </button>
 
-              <!-- Reductor de Resolución (Slider interactivo: reduce peso en KB manteniendo escala en pantalla) -->
+              <!-- Reductor de Resolución (Slider interactivo) -->
               <div class="space-y-1">
-                <div class="flex justify-between items-center text-[11px]">
-                  <span class="text-gray-400 font-semibold" title="Reduce la resolución real interna de la imagen/GIF para bajar drásticamente el peso del archivo .bin conservando su tamaño en pantalla">📉 Reducir Resolución (Ahorro KB):</span>
-                  <span id="txt-res-pct-info" class="text-cyan-400 font-mono text-[10px] font-bold">100%</span>
+                <div class="flex justify-between items-center text-[10px]">
+                  <span class="text-[#7f889b]">SUBSAMPLE RESOLUTION:</span>
+                  <span id="txt-res-pct-info" class="text-[#1f8fff] font-bold">100%</span>
                 </div>
-                <div class="flex items-center gap-2 pt-1">
-                  <span class="text-[10px] text-gray-500 font-mono">10%</span>
+                <div class="flex items-center gap-2 pt-0.5">
+                  <span class="text-[9px] text-[#525a6c]">10%</span>
                   <input type="range" id="sl-res-pct" min="10" max="100" step="5" value="100"
-                         class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                         class="w-full h-1 bg-[#212633] rounded appearance-none cursor-pointer accent-[#1f8fff]"
                          oninput="onResolutionSliderInput(this.value)"
                          onchange="onResolutionSliderChange(this.value)">
-                  <span class="text-[10px] text-gray-500 font-mono">100%</span>
+                  <span class="text-[9px] text-[#525a6c]">100%</span>
                 </div>
               </div>
 
-              <!-- Compresor de Calidad (Entropía / Profundidad de Color) -->
+              <!-- Compresor de Calidad -->
               <div class="space-y-1">
-                <div class="flex justify-between items-center text-[11px]">
-                  <span class="text-gray-400 font-semibold">🎨 Comprimir Colores (KB):</span>
+                <div class="flex justify-between items-center text-[10px]">
+                  <span class="text-[#7f889b]">PALETTE QUANTIZATION:</span>
                 </div>
-                <div class="grid grid-cols-5 gap-1 text-[11px]">
-                  <button onclick="compressLayerQuality(128)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-200 transition" title="Calidad Alta: 128 colores (reduce ~30% KB)">
-                    128c
-                  </button>
-                  <button onclick="compressLayerQuality(64)" class="p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded font-semibold text-gray-300 transition" title="Calidad Media: 64 colores (reduce ~50% KB)">
-                    64c
-                  </button>
-                  <button onclick="compressLayerQuality(32)" class="p-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 rounded font-semibold text-amber-200 transition" title="Compresión Fuerte: 32 colores (reduce ~70% KB)">
-                    32c
-                  </button>
-                  <button onclick="compressLayerQuality(16)" class="p-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 rounded font-semibold text-rose-200 transition" title="Compresión Ultra: 16 colores (reduce ~85% KB)">
-                    16c
-                  </button>
-                  <button onclick="compressLayerQuality(8)" class="p-1.5 bg-red-950/80 hover:bg-red-900 border border-red-700/70 rounded font-semibold text-red-200 transition" title="Compresión Extrema / Retro: 8 colores (reduce hasta 90% KB)">
-                    8c
-                  </button>
+                <div class="grid grid-cols-5 gap-1 text-[10px]">
+                  <button onclick="compressLayerQuality(128)" class="p-1 btn-tactile" title="128 colores">128c</button>
+                  <button onclick="compressLayerQuality(64)" class="p-1 btn-tactile" title="64 colores">64c</button>
+                  <button onclick="compressLayerQuality(32)" class="p-1 btn-tactile text-amber-300" title="32 colores">32c</button>
+                  <button onclick="compressLayerQuality(16)" class="p-1 btn-tactile text-rose-300" title="16 colores">16c</button>
+                  <button onclick="compressLayerQuality(8)" class="p-1 btn-tactile text-red-400" title="8 colores">8c</button>
                 </div>
               </div>
 
-              <!-- Opciones exclusivas para GIF (Muestreo Configurable del Video Completo) -->
-              <div id="gif-compress-options" class="hidden pt-2 space-y-2 border-t border-gray-800/60">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-cyan-400 font-semibold">🎞️ Frames GIF (Video Completo):</span>
-                  <span id="txt-gif-orig-info" class="text-gray-400 text-[10px] font-mono">12f orig</span>
+              <!-- Opciones exclusivas para GIF -->
+              <div id="gif-compress-options" class="hidden pt-2 space-y-2 border-t border-[#212633]">
+                <div class="flex items-center justify-between text-[10px]">
+                  <span class="text-[#1f8fff]">GIF FRAMES // TIMELINE:</span>
+                  <span id="txt-gif-orig-info" class="text-[#7f889b]">12f orig</span>
                 </div>
 
-                <!-- 1. Dividir frames del video (Configurable) -->
-                <div class="bg-gray-950/60 p-2 rounded-lg border border-gray-800/80 space-y-1.5">
-                  <div class="flex items-center justify-between text-[11px] text-gray-300">
-                    <span title="Toma el total de frames del video original y lo divide uniformemente">Dividir video entre:</span>
+                <!-- 1. Dividir frames del video -->
+                <div class="bg-[#08090d] p-2 rounded border border-[#1c212d] space-y-1.5">
+                  <div class="flex items-center justify-between text-[10px] text-[#7f889b]">
+                    <span>FRAME DECIMATION:</span>
                     <div class="flex items-center gap-1">
-                      <button id="btn-subsample-2" onclick="subsampleGifFrames(2)" class="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs font-semibold border border-transparent transition" title="Dividir entre 2 (1 de cada 2 frames)">÷2</button>
-                      <button id="btn-subsample-3" onclick="subsampleGifFrames(3)" class="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs font-semibold border border-transparent transition" title="Dividir entre 3 (ej. 12f ÷ 3 = 4 frames completos)">÷3</button>
-                      <button id="btn-subsample-4" onclick="subsampleGifFrames(4)" class="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs font-semibold border border-transparent transition" title="Dividir entre 4">÷4</button>
+                      <button id="btn-subsample-2" onclick="subsampleGifFrames(2)" class="px-2 py-0.5 btn-tactile text-[10px]">/2</button>
+                      <button id="btn-subsample-3" onclick="subsampleGifFrames(3)" class="px-2 py-0.5 btn-tactile text-[10px]">/3</button>
+                      <button id="btn-subsample-4" onclick="subsampleGifFrames(4)" class="px-2 py-0.5 btn-tactile text-[10px]">/4</button>
                     </div>
                   </div>
-                  <div class="flex items-center gap-2 text-xs">
-                    <span class="text-gray-400 text-[10px]">Divisor personalizado:</span>
-                    <input type="number" id="inp-gif-divisor" min="1" max="20" placeholder="Ej: 3" class="w-14 bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-center text-white font-mono text-xs">
-                    <button onclick="applyCustomGifDivisor()" class="px-2 py-0.5 bg-cyan-700 hover:bg-cyan-600 text-white rounded text-[11px] font-semibold transition">
-                      Aplicar
-                    </button>
+                  <div class="flex items-center gap-2 text-[10px]">
+                    <span class="text-[#525a6c]">CUSTOM DIV:</span>
+                    <input type="number" id="inp-gif-divisor" min="1" max="20" placeholder="Ej: 3" class="w-12 bg-[#121620] border border-[#212633] rounded px-1 text-center text-white text-[10px] focus:border-[#1f8fff] focus:outline-none">
+                    <button onclick="applyCustomGifDivisor()" class="px-2 py-0.5 btn-action-azure text-[10px]">SET</button>
                   </div>
                 </div>
 
                 <!-- 2. Fijar número exacto de frames muestreados -->
-                <div class="flex items-center justify-between text-[11px] text-gray-300 pt-0.5">
-                  <span>Frames exactos:</span>
-                  <div class="flex items-center gap-1.5">
-                    <button id="btn-exact-4" onclick="reduceGifFrames(4)" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition">4f</button>
-                    <button id="btn-exact-6" onclick="reduceGifFrames(6)" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition">6f</button>
-                    <button id="btn-exact-8" onclick="reduceGifFrames(8)" class="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition">8f</button>
-                    <input type="number" id="inp-gif-exact-frames" min="2" max="24" placeholder="Cant." class="w-12 bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-center text-white font-mono text-[10px]" onchange="applyCustomGifExactFrames()">
+                <div class="flex items-center justify-between text-[10px] text-[#7f889b] pt-0.5">
+                  <span>EXACT COUNT:</span>
+                  <div class="flex items-center gap-1">
+                    <button id="btn-exact-4" onclick="reduceGifFrames(4)" class="px-1.5 py-0.5 btn-tactile text-[10px]">4f</button>
+                    <button id="btn-exact-6" onclick="reduceGifFrames(6)" class="px-1.5 py-0.5 btn-tactile text-[10px]">6f</button>
+                    <button id="btn-exact-8" onclick="reduceGifFrames(8)" class="px-1.5 py-0.5 btn-tactile text-[10px]">8f</button>
+                    <input type="number" id="inp-gif-exact-frames" min="2" max="24" placeholder="Qty" class="w-10 bg-[#121620] border border-[#212633] rounded px-1 text-center text-white text-[10px] focus:border-[#1f8fff] focus:outline-none" onchange="applyCustomGifExactFrames()">
                   </div>
                 </div>
 
-                <!-- 3. Velocidad sincronizada automáticamente (Hardware extra[2]) -->
-                <div class="bg-gray-950/60 p-2 rounded-lg border border-gray-800/80 flex items-center justify-between text-[11px]">
-                  <span class="text-gray-300" title="Ajuste 100% automático de velocidad para conservar la duración exacta del video según la cantidad de fotogramas">⏱️ Velocidad Sincronizada:</span>
-                  <span id="txt-hw-speed-info" class="text-cyan-400 font-mono text-[11px] font-bold">Auto</span>
+                <!-- 3. Velocidad sincronizada -->
+                <div class="bg-[#08090d] p-1.5 rounded border border-[#1c212d] flex items-center justify-between text-[10px]">
+                  <span class="text-[#7f889b]">HW PLAYBACK RATE:</span>
+                  <span id="txt-hw-speed-info" class="text-[#1f8fff] font-bold">AUTO SYNC</span>
                 </div>
               </div>
             </div>
@@ -1796,42 +1946,46 @@ def get_studio_ui_html() -> str:
 
 
     <!-- ==================== PESTAÑA 3: GALERÍA DE 80 TEMAS ==================== -->
-    <section id="tab-gallery" class="space-y-6 hidden">
-      <div class="flex items-center justify-between">
+    <section id="tab-gallery" class="space-y-4 hidden">
+      <div class="border-b border-[#212633] pb-2 flex items-center justify-between">
         <div>
-          <h2 class="text-base font-bold">Catálogo Completo de 80 Esferas Oficiales (320×172)</h2>
-          <p class="text-xs text-gray-400">Descargadas directamente del servidor de A9 Pro. Puedes abrirlas en el Personalizador o subirlas a la caja con 1 clic.</p>
+          <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-white">OFFICIAL FIRMWARE REPOSITORY // 80 PRESETS (320x172)</h2>
+          <p class="text-[10px] font-mono text-[#7f889b]">Direct binary images extracted from A9 Pro ROM. One-click load or direct Bluetooth flashing.</p>
         </div>
       </div>
 
       <!-- Cuadrícula de Temas -->
-      <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <!-- Render dinámico de temas -->
       </div>
     </section>
 
   </main>
 
-  <!-- Modal de Progreso de Subida BLE -->
-  <div id="modal-upload" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full mx-4 space-y-4 text-center">
-      <h3 class="text-lg font-bold">Subiendo Esfera a la A9 Pro Box</h3>
-      <p class="text-xs text-gray-400">Transmitiendo por Bluetooth LE L2CAP (paquetes de 128 bytes)...</p>
+  <!-- Modal de Transmisión BLE Industrial -->
+  <div id="modal-upload" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden font-mono">
+    <div class="panel-chassis p-5 max-w-md w-full mx-4 space-y-3 text-center bg-[#0d0f15] border border-[#1f8fff]/50 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-[#212633] pb-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-white">FIRMWARE UPLOAD // BLE L2CAP</h3>
+        <span class="text-[9px] text-[#1f8fff]">CHANNEL 0x22</span>
+      </div>
       
-      <div class="w-full bg-gray-800 rounded-full h-4 overflow-hidden">
-        <div id="upload-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+      <p class="text-[10px] text-[#7f889b]">Transmitting payload in 128-byte framed packets...</p>
+      
+      <div class="w-full bg-[#08090d] rounded-sm h-2 overflow-hidden border border-[#212633]">
+        <div id="upload-bar" class="bg-[#1f8fff] h-2 transition-all duration-200" style="width: 0%"></div>
       </div>
 
-      <div class="flex justify-between items-center text-xs text-gray-400">
-        <span id="upload-pct">0%</span>
-        <span id="upload-packets">0 / 0 paquetes</span>
+      <div class="flex justify-between items-center text-[10px] text-[#7f889b]">
+        <span id="upload-pct" class="text-white font-bold">0%</span>
+        <span id="upload-packets">0 / 0 PKTS</span>
         <span id="upload-speed">0 KB/s</span>
       </div>
 
-      <div id="upload-msg" class="text-xs font-semibold text-blue-400">Preparando transmisión...</div>
+      <div id="upload-msg" class="text-xs font-semibold text-[#1f8fff] bg-[#08090d] p-1.5 rounded border border-[#1c212c]">INITIALIZING TRANSMISSION...</div>
       
-      <button id="btn-close-modal" onclick="closeUploadModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-semibold hidden">
-        Cerrar
+      <button id="btn-close-modal" onclick="closeUploadModal()" class="px-4 py-1.5 btn-tactile text-xs hidden w-full">
+        DISMISS
       </button>
     </div>
   </div>
@@ -1872,9 +2026,9 @@ def get_studio_ui_html() -> str:
         document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
         const btn = document.getElementById(`btn-tab-${t}`);
         if (t === tab) {
-          btn.className = 'px-4 py-1.5 rounded-lg text-sm font-medium transition bg-blue-600 text-white shadow';
+          btn.className = 'px-3.5 py-1 rounded text-xs font-mono font-semibold transition bg-[#1f8fff] text-white shadow-sm flex items-center gap-1.5';
         } else {
-          btn.className = 'px-4 py-1.5 rounded-lg text-sm font-medium transition text-gray-300 hover:text-white';
+          btn.className = 'px-3.5 py-1 rounded text-xs font-mono font-medium transition text-[#7f889b] hover:text-white flex items-center gap-1.5';
         }
       });
       if (tab === 'gallery') loadOfficialGallery();
@@ -1892,11 +2046,11 @@ def get_studio_ui_html() -> str:
     };
 
     let toastTimer = null;
-    function showToast(title, msg, icon = '⚡', isGreen = true) {
+    function showToast(title, msg, icon = 'OK', isGreen = true) {
       const toast = document.getElementById('toast-notify');
       if (!toast) return;
       document.getElementById('toast-title').innerText = title;
-      document.getElementById('toast-title').className = isGreen ? 'text-xs font-bold text-emerald-400' : 'text-xs font-bold text-amber-400';
+      document.getElementById('toast-title').className = isGreen ? 'text-xs font-mono font-bold text-emerald-400' : 'text-xs font-mono font-bold text-[#1f8fff]';
       document.getElementById('toast-msg').innerText = msg;
       document.getElementById('toast-icon').innerText = icon;
       toast.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
@@ -1916,13 +2070,13 @@ def get_studio_ui_html() -> str:
         const badge = document.getElementById('badge-conn');
         const btnConn = document.getElementById('btn-conn-text');
         if (st.connected) {
-          badge.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-400 border border-emerald-700/50';
-          badge.innerText = 'Conectado';
-          btnConn.innerText = 'Desconectar';
+          badge.className = 'text-[9px] font-mono px-2 py-0.5 rounded uppercase font-semibold bg-[#0d1f18] text-[#10b981] border border-[#10b981]/40 flex items-center gap-1.5';
+          badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span><span>CONNECTED</span>';
+          btnConn.innerText = 'UNLINK DEVICE';
         } else {
-          badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-900/60 text-red-400 border border-red-700/50';
-          badge.innerText = 'Desconectado';
-          btnConn.innerText = 'Conectar Caja';
+          badge.className = 'text-[9px] font-mono px-2 py-0.5 rounded uppercase font-semibold bg-[#1a1114] text-[#ef4444] border border-[#ef4444]/40 flex items-center gap-1.5';
+          badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span><span>DISCONNECTED</span>';
+          btnConn.innerText = 'LINK DEVICE';
         }
 
         // Detección de cambios de carga en tiempo real (notificaciones toast)
@@ -1955,14 +2109,14 @@ def get_studio_ui_html() -> str:
         if (st.left_charging) {
           iconChargeL.classList.remove('hidden');
           badgeModeL.innerText = '⚡ Cargando en caja';
-          badgeModeL.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/80 animate-pulse';
-          cardL.className = 'bg-gray-900 border-2 border-emerald-500/80 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300 shadow-[0_0_25px_rgba(16,185,129,0.2)]';
+          badgeModeL.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 animate-pulse';
+          cardL.className = 'card-panel border-emerald-500/80 shadow-[0_0_25px_rgba(16,185,129,0.2)] p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300';
           if (glowL) glowL.classList.remove('opacity-0');
         } else {
           iconChargeL.classList.add('hidden');
           badgeModeL.innerText = 'En uso / Activo';
-          badgeModeL.className = 'text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-800 text-gray-400 border border-gray-700';
-          cardL.className = 'bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300';
+          badgeModeL.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-slate-900 text-slate-400 border border-white/5';
+          cardL.className = 'card-panel p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300';
           if (glowL) glowL.classList.add('opacity-0');
         }
 
@@ -1976,14 +2130,14 @@ def get_studio_ui_html() -> str:
         if (st.right_charging) {
           iconChargeR.classList.remove('hidden');
           badgeModeR.innerText = '⚡ Cargando en caja';
-          badgeModeR.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/80 animate-pulse';
-          cardR.className = 'bg-gray-900 border-2 border-emerald-500/80 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300 shadow-[0_0_25px_rgba(16,185,129,0.2)]';
+          badgeModeR.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 animate-pulse';
+          cardR.className = 'card-panel border-emerald-500/80 shadow-[0_0_25px_rgba(16,185,129,0.2)] p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300';
           if (glowR) glowR.classList.remove('opacity-0');
         } else {
           iconChargeR.classList.add('hidden');
           badgeModeR.innerText = 'En uso / Activo';
-          badgeModeR.className = 'text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-800 text-gray-400 border border-gray-700';
-          cardR.className = 'bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300';
+          badgeModeR.className = 'text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-slate-900 text-slate-400 border border-white/5';
+          cardR.className = 'card-panel p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300';
           if (glowR) glowR.classList.add('opacity-0');
         }
 
@@ -1994,10 +2148,10 @@ def get_studio_ui_html() -> str:
         const cardBox = document.getElementById('card-box');
         if (st.box_charging) {
           iconChargeBox.classList.remove('hidden');
-          cardBox.className = 'bg-gray-900 border-2 border-amber-500/80 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden shadow-[0_0_25px_rgba(245,158,11,0.2)] transition-all duration-300';
+          cardBox.className = 'card-panel border-amber-500/80 shadow-[0_0_25px_rgba(245,158,11,0.2)] p-5 flex flex-col items-center justify-between text-center relative overflow-hidden transition-all duration-300';
         } else {
           iconChargeBox.classList.add('hidden');
-          cardBox.className = 'bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col items-center justify-between text-center relative overflow-hidden shadow-2xl transition-all duration-300';
+          cardBox.className = 'card-panel p-5 flex flex-col items-center justify-between text-center relative overflow-hidden shadow-2xl transition-all duration-300';
         }
 
         // Pantalla dentro del mockup de la caja
@@ -2011,17 +2165,16 @@ def get_studio_ui_html() -> str:
         [0, 1, 2].forEach(m => {
           const btn = document.getElementById(`btn-anc-${m}`);
           if (btn) btn.className = (st.noise_mode === m)
-            ? 'flex flex-col items-center justify-center p-3 rounded-xl border border-blue-500 bg-blue-950/40 transition'
-            : 'flex flex-col items-center justify-center p-3 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition';
+            ? 'flex flex-col items-center justify-center p-2.5 rounded border border-[#1f8fff] bg-[#1f8fff]/15 transition'
+            : 'flex flex-col items-center justify-center p-2.5 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition';
         });
 
         [0, 1, 2].forEach(m => {
           const btn = document.getElementById(`btn-work-${m}`);
           if (btn) btn.className = (st.work_mode === m)
-            ? 'flex flex-col items-center p-2.5 rounded-xl border border-blue-500 bg-blue-950/40 transition'
-            : 'flex flex-col items-center p-2.5 rounded-xl border border-gray-800 bg-gray-800/50 hover:border-blue-500 transition';
+            ? 'flex flex-col items-center p-2 rounded border border-[#1f8fff] bg-[#1f8fff]/15 transition'
+            : 'flex flex-col items-center p-2 rounded border border-[#212633] bg-[#0c0e14] hover:border-[#333a4d] transition';
         });
-
       } catch (e) {
         console.error("Error consultando estado", e);
       }
@@ -2230,10 +2383,10 @@ def get_studio_ui_html() -> str:
       const dayName = days[now.getDay()];
 
       const bClock = document.getElementById('btn-add-clock');
-      if (bClock) bClock.innerHTML = `🕒 Reloj Digital (${hh}:${mm})`;
+      if (bClock) bClock.innerHTML = `<svg class="w-3.5 h-3.5 text-[#1f8fff] inline-block mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>DIGITAL CLOCK (${hh}:${mm})`;
 
       const bDate = document.getElementById('btn-add-date');
-      if (bDate) bDate.innerHTML = `📅 Fecha & Día (${dayName} ${month}/${day})`;
+      if (bDate) bDate.innerHTML = `<svg class="w-3.5 h-3.5 text-[#1f8fff] inline-block mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>DATE & DAY (${dayName} ${month}/${day})`;
     }
 
     // Bucle de renderizado para animaciones en vivo sincronizado a 30 FPS
@@ -2286,7 +2439,7 @@ def get_studio_ui_html() -> str:
       project.layers.slice().reverse().forEach(l => {
         const item = document.createElement('div');
         const isSel = l.id === selectedLayerId;
-        item.className = `p-2 rounded-lg border text-xs flex items-center justify-between cursor-pointer transition ${isSel ? 'border-blue-500 bg-blue-950/40 text-white' : 'border-gray-800 bg-gray-800/40 text-gray-300 hover:border-gray-700'}`;
+        item.className = `p-2 rounded border text-xs font-mono flex items-center justify-between cursor-pointer transition ${isSel ? 'border-[#1f8fff] bg-[#1f8fff]/15 text-white' : 'border-[#212633] bg-[#090b10] text-[#7f889b] hover:border-[#333a4d] hover:text-white'}`;
         item.onclick = () => selectLayer(l.id);
         item.innerHTML = `
           <div class="flex items-center space-x-2 truncate">
@@ -2358,9 +2511,9 @@ def get_studio_ui_html() -> str:
           if (!el) return;
           const isActive = Number(l.active_divisor) === Number(b.div);
           if (isActive) {
-            el.className = 'px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
+            el.className = 'px-2 py-0.5 bg-[#1f8fff] text-white rounded text-[10px] font-mono font-bold border border-[#4da7ff]';
           } else {
-            el.className = 'px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs font-semibold border border-transparent transition';
+            el.className = 'px-2 py-0.5 bg-[#1f8fff] text-white rounded text-[10px] font-mono font-bold border border-[#4da7ff]';
           }
         });
 
@@ -2376,7 +2529,7 @@ def get_studio_ui_html() -> str:
           if (isActive) {
             el.className = 'px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold border border-cyan-400 shadow-md shadow-cyan-900/50 transition';
           } else {
-            el.className = 'px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs border border-transparent transition';
+            el.className = 'px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs border border-transparent transition';
           }
         });
 
@@ -2404,7 +2557,7 @@ def get_studio_ui_html() -> str:
           fsTxt.innerText = 'ON (320×172)';
           fsTxt.className = 'font-extrabold text-blue-100';
         } else {
-          fsBtn.className = 'w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition';
+          fsBtn.className = 'w-full p-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition';
           fsTxt.innerText = 'OFF';
           fsTxt.className = 'font-bold text-gray-400';
         }
@@ -2427,7 +2580,7 @@ def get_studio_ui_html() -> str:
           const fsTxt = document.getElementById('txt-fullscreen-status');
           if (fsTxt) { fsTxt.innerText = 'OFF'; fsTxt.className = 'font-bold text-gray-400'; }
           const fsBtn = document.getElementById('btn-toggle-fullscreen');
-          if (fsBtn) { fsBtn.className = 'w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition'; }
+          if (fsBtn) { fsBtn.className = 'w-full p-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition'; }
         }
         l[axis] = parseInt(val) || 0;
         drawCanvas();
@@ -2443,7 +2596,7 @@ def get_studio_ui_html() -> str:
         const fsTxt = document.getElementById('txt-fullscreen-status');
         if (fsTxt) { fsTxt.innerText = 'OFF'; fsTxt.className = 'font-bold text-gray-400'; }
         const fsBtn = document.getElementById('btn-toggle-fullscreen');
-        if (fsBtn) { fsBtn.className = 'w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition'; }
+        if (fsBtn) { fsBtn.className = 'w-full p-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition'; }
       }
       const cnt = l.count || 1;
       const fw = Math.floor(imWidth(l) / cnt);
@@ -2775,7 +2928,7 @@ def get_studio_ui_html() -> str:
           const fsTxt = document.getElementById('txt-fullscreen-status');
           if (fsTxt) { fsTxt.innerText = 'OFF'; fsTxt.className = 'font-bold text-gray-400'; }
           const fsBtn = document.getElementById('btn-toggle-fullscreen');
-          if (fsBtn) { fsBtn.className = 'w-full p-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition'; }
+          if (fsBtn) { fsBtn.className = 'w-full p-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition'; }
         }
         l.x = Math.round(initialLayerX + (mx - dragStartX));
         l.y = Math.round(initialLayerY + (my - dragStartY));
@@ -3408,21 +3561,21 @@ def get_studio_ui_html() -> str:
 
       list.forEach(item => {
         const card = document.createElement('div');
-        card.className = 'bg-gray-900 border border-gray-800 rounded-xl p-3 flex flex-col items-center space-y-2 hover:border-blue-500/50 transition';
+        card.className = 'panel-chassis p-3 flex flex-col justify-between space-y-2 hover:border-[#1f8fff]/60 transition font-mono';
         card.innerHTML = `
-          <div class="w-full h-24 bg-black rounded-lg overflow-hidden flex items-center justify-center">
-            ${item.thumbnail_url ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">` : '<span class="text-xs text-gray-600">Sin vista</span>'}
+          <div class="w-full h-24 bg-black screen-chassis rounded overflow-hidden flex items-center justify-center">
+            ${item.thumbnail_url ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">` : '<span class="text-[10px] text-[#525a6c]">NO PREVIEW</span>'}
           </div>
-          <div class="w-full flex justify-between items-center text-[10px] text-gray-400">
+          <div class="w-full flex justify-between items-center text-[10px] text-[#7f889b] pt-1 border-t border-[#1e2330]">
             <span class="truncate font-mono">${item.id.split('_')[0]}</span>
-            <span>${Math.round(item.size_bytes / 1024)} KB</span>
+            <span class="font-mono">${Math.round(item.size_bytes / 1024)} KB</span>
           </div>
-          <div class="grid grid-cols-2 gap-1.5 w-full pt-1">
-            <button onclick="loadOfficialToStudio('${item.id}')" class="py-1 px-2 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-200">
-              ✏️ Editar
+          <div class="grid grid-cols-2 gap-1.5 w-full pt-0.5">
+            <button onclick="loadOfficialToStudio('${item.id}')" class="py-1 px-1.5 btn-tactile text-[10px]">
+              EDIT
             </button>
-            <button onclick="uploadOfficialDirect('${item.id}')" class="py-1 px-2 bg-blue-600/80 hover:bg-blue-600 rounded text-[11px] font-semibold text-white">
-              📤 Subir
+            <button onclick="uploadOfficialDirect('${item.id}')" class="py-1 px-1.5 btn-action-azure text-[10px]">
+              FLASH
             </button>
           </div>
         `;

@@ -7,8 +7,8 @@ orig_html = a9pro_studio.get_studio_ui_html()
 # Reemplazar rutas de assets absolutas por relativas
 orig_html = orig_html.replace('/web_assets/', 'assets/')
 
-# Separar el HTML en markup y script
-script_start = orig_html.find('<script>')
+# Separar el HTML en markup y script (buscar el último script del body)
+script_start = orig_html.rfind('<script>')
 html_head_and_body = orig_html[:script_start]
 
 # En el head, inyectar los scripts necesarios y las fuentes @font-face
