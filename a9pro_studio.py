@@ -2105,6 +2105,7 @@ def get_studio_ui_html() -> str:
 
         const cnt = layer.count || 1;
         const fw = Math.floor(imWidth(layer) / cnt);
+        const fh = imHeight(layer);
         const dw = layer.fit_screen ? 320 : (layer.target_w || layer.orig_w || fw);
         const dh = layer.fit_screen ? 172 : (layer.target_h || layer.orig_h || fh);
         const x = layer.fit_screen ? 160 : layer.x;
@@ -2741,6 +2742,7 @@ def get_studio_ui_html() -> str:
         if (!l.visible) continue;
         const cnt = l.count || 1;
         const fw = Math.floor(imWidth(l) / cnt);
+        const fh = imHeight(l);
         const dw = l.fit_screen ? 320 : (l.target_w || l.orig_w || fw);
         const dh = l.fit_screen ? 172 : (l.target_h || l.orig_h || fh);
         const lx = l.fit_screen ? 160 : l.x;
